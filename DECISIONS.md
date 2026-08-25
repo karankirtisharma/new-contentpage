@@ -821,3 +821,65 @@ show small pieces of video off the panel. Measured, the effect on the UV extent
 is the same across all four faces (width inflation 5-16%, height 11-15%), so it
 is not what caused this report and tightening it would risk clipping real face
 edges on the other three. Left alone deliberately.
+
+## 7.15 · Framing the mount out of shot
+
+Asked to hide everything above a line drawn across the top of the frame — the
+canopy and the ceiling — by pushing the scene up until they are out of view.
+
+**Pushing up alone cannot do it.** The canopy is a disc of world radius 1.651
+seen from 3.47 away, subtending ~50 degrees against a 44 degree frame. Lowering
+the orbit centre (target and camera together, so the view direction is
+unchanged) lifts everything in frame, but the numbers run out:
+
+| drop | canopy far rim, % down from top | machine bottom, % down |
+|---|---|---|
+| 0 | 24.4 | 89.8 |
+| 0.15 | 18.7 | 81.2 |
+| 0.35 | 11.0 | 69.8 |
+| 0.55 | 3.5 | 58.3 |
+| 0.65 | -0.3 | 52.6 |
+
+The rim only clears the top edge at a drop of ~0.65, and by then the machine
+ends at 53% of the frame with the whole lower half empty. Rendered, it looks
+like the shot slid off the top of the screen.
+
+**The lens does the rest.** Narrowing FOV crops the top — taking the canopy with
+it — while magnifying about the frame centre, which pulls the machine's tail
+back down and widens it to fill the frame. Drop and lens have to move together:
+
+| FOV | drop | rim % | bottom % | left / right % |
+|---|---|---|---|---|
+| 28.5 | 0 | 24.4 | 89.8 | 7.6 / 92.2 |
+| 24 | 0.10 | 14.8 | 90.6 | 4.4 / 93.3 |
+| 22 | 0.14 | 9.5 | 91.5 | 2.4 / 97.4 |
+| **20** | **0.18** | **3.2** | **92.3** | **0 / 99.9** |
+| 19 | 0.21 | -1.0 | 92.0 | 0 / 99.9 |
+| 18 | 0.24 | -5.8 | 91.7 | 0 / 99.9 |
+
+**Shipped: `CAMERA_FOV` 20, `FRAME_DROP` 0.18.** The lid edge that cut across
+the frame goes from 24.4% down to 3.2% down, the machine's bottom improves from
+89.8% to 92.3%, and the shot fills the frame edge to edge. Verified identical at
+all eight 45-degree steps of the orbit, which follows from the canopy being a
+disc and the scene being symmetric about Y.
+
+**It is a reduction, not a removal, and that is deliberate.** Taking the rim to
+exactly 0 needs FOV 19, and at 19 the outer screens are cut hard at the frame
+sides and the machine's head goes with them. A dark sliver along the top edge,
+mostly behind the spine, reads as nothing; losing half a screen does not.
+
+Two consequences worth naming: the machine's head now bleeds off the top edge —
+unavoidable, since the canopy sits directly above it, so hiding one crops the
+other — and the shot is tighter overall, so the screens sit closer to the frame
+sides.
+
+`FRAME_DROP` does not disturb the height lock from §7.13: `ORBIT_POLAR` and
+`ORBIT_RADIUS` are built from `ORBIT_XZ` and `ORBIT_RISE`, which are offsets
+relative to the orbit centre, so moving that centre moves the whole rig without
+changing the angle or the distance. Confirmed on the shipped build — orbit
+centre -0.2971 against a machine centre of -0.1171, polar still pinned at
+1.5996.
+
+`#scene3d` is a fixed 1024x629 box that chrome.js only scales, so the aspect is
+1.628 on every device and this framing is identical everywhere — a vertical FOV
+change is safe here in a way it would not be in a fluid layout.

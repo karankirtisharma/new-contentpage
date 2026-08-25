@@ -67,6 +67,43 @@ const SCROLL_SPIN     = 0.0016; /* radians of rig.rotation.y per scrolled design
    ORBIT_XZ with ORBIT_RISE of height relative to the target, so this is the
    angle the intro dolly lands on and the angle the orbit is now locked to.
    Retuning ORBIT_RISE or ORBIT_XZ moves the lock with it. */
+/* FRAMING — hiding the mount.
+   The canopy is a disc of world radius 1.651 seen from 3.47 away, so it
+   subtends about 50 degrees against a 44 degree horizontal frame: it filled the
+   top quarter of the shot and read as a saucer with a lid, whatever the ceiling
+   shader did underneath it. Two changes together push it out of frame.
+
+   FRAME_DROP lowers the orbit centre — the target AND the camera, together, so
+   the view direction is unchanged — which lifts everything in the frame by the
+   same amount. On its own it cannot finish the job: the canopy only clears the
+   top edge at a drop of ~0.65, and by then the machine has ridden so far up
+   that its bottom sits at 53% of the frame with the rest empty.
+
+   So the lens does the rest. FOV 28.5 -> 20 crops the top (taking the canopy
+   with it) while magnifying about the frame centre, which pulls the machine's
+   tail back DOWN to 92% and widens it to fill the frame edge to edge. Drop and
+   lens have to move together; neither works alone.
+
+   Measured at the shipped values, over all eight 45-degree steps of the orbit:
+   the canopy's far rim — the lid edge that used to cut across the frame — sits
+   at 3.2% down from the top, against 24.4% before, and the machine's bottom at
+   92.2-92.8% with the frame full edge to edge. Identical at every angle, since
+   the canopy is a disc and the scene is symmetric about Y.
+
+   So the mount is reduced to a dark sliver along the very top edge, mostly
+   behind the spine, rather than removed outright. Taking it to exactly 0 needs
+   FOV 19 / drop 0.21, and at 19 the outer screens are cut hard at the frame
+   sides and the machine's head goes with them — a worse trade than a sliver
+   nobody reads as a lid.
+
+   #scene3d is a fixed 1024x629 box that chrome.js only scales, so the aspect is
+   1.628 on every device and this framing is identical everywhere. */
+const FRAME_DROP      = 0.18;   /* orbit centre below the machine's own centre */
+const CAMERA_FOV      = 20;     /* was 28.5 */
+
+/* Unaffected by FRAME_DROP: both are built from ORBIT_XZ and ORBIT_RISE, which
+   are offsets RELATIVE to the orbit centre, so moving that centre moves the
+   whole rig without changing the angle or the distance. */
 const ORBIT_POLAR     = Math.atan2(Math.hypot(ORBIT_XZ[0], ORBIT_XZ[1]), ORBIT_RISE);
 const ORBIT_RADIUS    = Math.hypot(ORBIT_XZ[0], ORBIT_XZ[1], ORBIT_RISE);
 
@@ -81,7 +118,7 @@ const container = document.getElementById('scene3d');
 const scene = new THREE.Scene();
 scene.background = null;
 
-const camera = new THREE.PerspectiveCamera(28.5, container.clientWidth / container.clientHeight, 0.1, 100);
+const camera = new THREE.PerspectiveCamera(CAMERA_FOV, container.clientWidth / container.clientHeight, 0.1, 100);
 /* Provisional only — the real pose is set from ORBIT_Y once the rig loads, and
    nothing renders before then. */
 camera.position.set(-2.686, 0.52, -2.199);
@@ -827,8 +864,9 @@ Promise.all([Promise.race([Promise.all([modelP, heroVideoP]), timeoutP]), minLoa
   try {
     rig.updateMatrixWorld(true);
     /* re-centre the orbit on the machine now that its height is known */
-    introToLook.set(0, ORBIT_Y, 0);
-    introToPos.set(ORBIT_XZ[0], ORBIT_Y + ORBIT_RISE, ORBIT_XZ[1]);
+    /* the orbit centre sits FRAME_DROP below the machine's centre — see FRAMING */
+    introToLook.set(0, ORBIT_Y - FRAME_DROP, 0);
+    introToPos.set(ORBIT_XZ[0], ORBIT_Y - FRAME_DROP + ORBIT_RISE, ORBIT_XZ[1]);
     controls.target.copy(introToLook);
 
     const normal = outwardNormal(s3);
@@ -855,9 +893,9 @@ Promise.all([Promise.race([Promise.all([modelP, heroVideoP]), timeoutP]), minLoa
   } catch (e) {
     introRunning = false;
     controls.enabled = true;
-    camera.position.set(ORBIT_XZ[0], ORBIT_Y + ORBIT_RISE, ORBIT_XZ[1]);
-    camera.lookAt(0, ORBIT_Y, 0);
-    controls.target.set(0, ORBIT_Y, 0);
+    camera.position.set(ORBIT_XZ[0], ORBIT_Y - FRAME_DROP + ORBIT_RISE, ORBIT_XZ[1]);
+    camera.lookAt(0, ORBIT_Y - FRAME_DROP, 0);
+    controls.target.set(0, ORBIT_Y - FRAME_DROP, 0);
   }
 
   /* Compile every material now, while nothing is on screen yet. Without this
