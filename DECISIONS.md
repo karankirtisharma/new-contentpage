@@ -565,3 +565,75 @@ Depth comes from the grade's contrast curve and vignette instead, and
 backdrop gradient to black — the background has to be visible as a gradient.
 
 No geometry, position, camera or scroll behaviour was touched.
+
+## 7.11 · The light rig came off, and the material was the real culprit
+
+The brief: strip the lighting off the GLB, get its original colours back, then
+light it with one white light so it reads the way the asset was designed —
+and fix the screens, which were too dark to see the video on.
+
+**The "weird lighting" on the spine was not lighting.** Measured off the GLB's
+own metallic-roughness texture, over all 1024²:
+
+| channel | mean | median | p10 | p90 |
+|---|---|---|---|---|
+| roughness (G) | 0.068 | **0.020** | 0.004 | 0.247 |
+| metalness (B) | 0.876 | **0.961** | 0.573 | 0.984 |
+
+That is one near-perfect mirror stretched over every part of the machine —
+panels, cables, hub alike. It is a Tripo bake, and the MR map is degenerate.
+A metal surface has **no diffuse response at all**, so at metalness 0.96 the
+model cannot show its basecolor under any light: it returns the environment,
+picking up the green only as a tint at grazing incidence. Hence the blown, wet,
+hotspot-down-the-spine read, and hence why the previous pass had to push
+`ENV_INTENSITY` to 3.4 — the env was the only thing the surface could see.
+
+So the map is kept, for its variation, and remapped in `onBeforeCompile`:
+`metalnessFactor *= 0.15` and `roughnessFactor = mix(0.42, 0.90, roughnessFactor)`.
+Same texture, same detail, but the surface is now diffuse-dominant and the
+basecolor — which is what the model's colours actually are — is what the lights
+land on and come back from. Nothing else about the PBR is touched: no emissive,
+no tint, no accent multiply.
+
+**Every light is now pure white and the rig is a plain three-point studio.**
+The old rig was performing a look at the model rather than lighting it: a
+26-intensity spot jammed against the mount with decay 2, plus a rim and a fill
+each on its own tint.
+
+| | before | after |
+|---|---|---|
+| ambient | `0x2a2e33` 0.42 | `0xffffff` 1.4 |
+| practical (spot) | `0xfff6ec` 26, angle 0.62, penumbra 0.82, decay 2 | `0xffffff` 9, angle 0.80, penumbra 0.95, decay 1.5 |
+| key | — (the spot was the key) | `0xffffff` 3.6, front-left 3/4 |
+| fill | `0xffffff` 0.32 | `0xffffff` 1.2 |
+| back/rim | `0xdfe9ff` 1.25 | `0xffffff` 1.5 |
+| env intensity | 3.4 | 1.6 |
+| exposure | 0.95 | 1.0 |
+
+The ceiling spot is kept only because it is what motivates the pool drawn on the
+dome and the shaft under it — softened to a room light spilling down the machine
+instead of a hotspot burning a hole in the top of it.
+
+**Intensities went UP across the board**, which looks wrong next to a brief
+about removing lighting, but the basecolor is dark: mean sRGB (0.19, 0.31, 0.09),
+value 0.31 at saturation 0.74. A diffuse surface that dark needs real light to
+show its colour, where a mirror needed almost none. Swept `key` 2.6 → 4.2 against
+green-channel clipping measured over the rendered frame; 3.6 / env 1.6 / exposure
+1.0 sits at 0.88% of lit pixels clipping, against 0.58% at the dimmest setting
+tried and 1.1% at the brightest — the knee, and the point past which the baked
+highlights in the basecolor start blowing out.
+
+**Screens: `SCREEN_GAIN` 0.26 → 0.70 and the ramp drive 0.62 → 1.0.** The drive
+is what actually hid the footage. It scales luminance before the §2 tier lookup,
+so at 0.62 a mid-grey pixel resolved at ramp position 0.31 — `#0a3d1f`,
+near-black — and every clip collapsed into the ramp's two darkest tiers with its
+content. At 1.0 mid-grey sits at `#148f43`→`#19e65a` and the video reads. Gain
+stops at 0.70 rather than higher because it multiplies in *linear* space on
+panels that opt out of tone mapping: 0.85 clipped a bright clip's sky flat and
+put the panels back in front of the machine. `HERO_ASSETS.screenGrade = 0` still
+drops the green grade for raw footage colour.
+
+`window.__composer` was added to the `?tune=1` exports, so a QA capture can force
+a frame without the rAF loop. No geometry, position, camera or scroll behaviour
+was touched.
+

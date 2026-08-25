@@ -99,59 +99,67 @@ renderer.setSize(container.clientWidth, container.clientHeight);
    so the §2 palette lands exactly where it did before. */
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.95;   /* raised back from 0.78: neutral lights deliver far less than green ones did */
+renderer.toneMappingExposure = 1.0;    /* 0.95 -> 1.0 with the white studio; the model's albedo is dark green and needs it */
 container.appendChild(renderer.domElement);
 
 /* ---------------------------------------------------------------- LIGHTS
-   Rebuilt for contrast. The old rig was a 40-intensity spot plus a rim AND a
-   fill, which lit every surface to roughly the same value — that flat, blown,
-   single-note look. The rule now is: one motivated key, one rim, almost no
-   ambient, and most of the frame left in shadow.
+   Torn down and rebuilt as a plain white studio.
 
-   Values changed:  ambient  0.30 -> 0.05 and re-hued to teal, so shadows fall
-                             toward blue-green instead of matching the accent
-                    spot     40 -> 26 but MOVED to 1.3 above the ceiling and
-                             narrowed (angle 0.62, penumbra 0.30 -> 0.82), so it
-                             lights the machine like the fixture it hangs from
-                             instead of washing it from the side
-                    fill     0.80 -> 0.10 (all but killed — it was the main
-                             cause of the even, formless lighting)
-                    rim      1.20 -> 1.25, and now WHITE — a green rim on a
-                             green model just deepened the single-hue problem  */
-/* White lights, not green ones. A green key on a green material multiplies to
-   a flat saturated green with no specular life; a white key lets the basecolor
-   supply the hue and the highlight come back near-white, which is the whole
-   difference between "tinted" and "wet glass". */
-const SHADOW_TONE = 0x2a2e33;     /* neutral, very slightly cool */
-const KEY_TINT    = 0xfff6ec;     /* white, a hair warm          */
-const RIM_TONE    = 0xdfe9ff;     /* white, a hair cool          */
-const FILL_TONE   = 0xffffff;
+   What was here before was a *look*: a 26-intensity spot jammed against the
+   mount with decay 2, a rim and a fill, each on its own tint, sculpting the
+   machine into something the asset was never authored to be. Combined with a
+   near-mirror material (see MATERIAL below) it produced the blown green
+   highlights down the spine — light that was being performed at the model
+   rather than falling on it.
 
-scene.add(new THREE.AmbientLight(SHADOW_TONE, 0.42));
+   Every light is now pure white and there is no styling left in the rig at
+   all: a soft overhead from the fixture the machine hangs from, a 3/4 key, a
+   weaker fill opposite it, and a back light for the silhouette. Classic
+   three-point plus a practical. Nothing tints, nothing sculpts — the hue in
+   the frame is the GLB's own basecolor and only that.
 
-/* motivated key: it lives AT the mount and points down the machine */
-/* Sits ABOVE the ceiling, not at the mount. With decay 2 a spot placed level
-   with the canopy is effectively inside the geometry, and 1/r^2 turns the mount
-   into a white blob. Backing it off 1.3 above the ceiling and raising the
-   intensity to match gives the same pool with a usable falloff. */
-const spotLight = new THREE.SpotLight(KEY_TINT, 26);
-spotLight.position.set(0, CEILING_Y + 1.3, 0);
+   Intensities are low on purpose. The material below is diffuse-dominant now,
+   so it actually *takes* light instead of only mirroring it, and the values
+   that used to be needed to make a mirror visible would blow a diffuse
+   surface flat white. */
+const LIGHT_WHITE = 0xffffff;     /* every light in the scene, no exceptions */
+const KEY_TINT    = LIGHT_WHITE;  /* the PMREM key card matches the practical */
+
+/* base level — the shadow side is a shadow, not a hole */
+scene.add(new THREE.AmbientLight(LIGHT_WHITE, 1.4));
+
+/* The practical: the ceiling fixture the machine is bolted to. Kept because it
+   is what motivates the pool drawn on the dome and the shaft under it — but
+   softened right down (26 -> 9, angle 0.62 -> 0.80, penumbra 0.82 -> 0.95,
+   decay 2 -> 1.5) so it reads as a room light spilling down the machine rather
+   than a hotspot burning a hole in the top of it. */
+const spotLight = new THREE.SpotLight(LIGHT_WHITE, 9);
+spotLight.position.set(0, CEILING_Y + 1.6, 0);
 spotLight.target.position.set(0, CEILING_Y - 2.4, 0);
-spotLight.angle = 0.62;
-spotLight.penumbra = 0.82;        /* soft-edged pool, not a hard cone */
-spotLight.decay = 2;
-spotLight.distance = 11;
+spotLight.angle = 0.80;
+spotLight.penumbra = 0.95;
+spotLight.decay = 1.5;            /* softer than inverse-square; the pool reaches the base */
+spotLight.distance = 13;
 scene.add(spotLight, spotLight.target);
 
-/* rim, opposite the idle camera, to lift the silhouette off the haze */
-const rimLight = new THREE.DirectionalLight(RIM_TONE, 1.25);
-rimLight.position.set(2.6, 1.3, 2.2);
-scene.add(rimLight);
+/* KEY — the light that actually shows the model its own colour. Front-left and
+   above, the standard 3/4 position; world-fixed, so the machine is modelled by
+   it differently at each point of the orbit instead of looking identical from
+   every angle. */
+const keyLight = new THREE.DirectionalLight(LIGHT_WHITE, 3.6);
+keyLight.position.set(-2.6, 2.2, -1.9);
+scene.add(keyLight);
 
-/* what is left of the fill — just enough that the shadow side is not a hole */
-const fillLight = new THREE.DirectionalLight(FILL_TONE, 0.32);
-fillLight.position.set(-2.2, 0.4, 1.8);
+/* FILL — opposite the key, roughly a third of it, so the far side keeps its
+   form without the two cancelling into flat, even lighting */
+const fillLight = new THREE.DirectionalLight(LIGHT_WHITE, 1.2);
+fillLight.position.set(2.8, 0.5, 1.6);
 scene.add(fillLight);
+
+/* BACK — grazing from behind and above, to lift the silhouette off the haze */
+const rimLight = new THREE.DirectionalLight(LIGHT_WHITE, 1.5);
+rimLight.position.set(1.6, 1.9, 2.6);
+scene.add(rimLight);
 
 /* ------------------------------------------------------- ATMOSPHERE
    Fog gives the rig depth — the far arms sink back instead of reading as one
@@ -207,10 +215,12 @@ scene.fog = new THREE.FogExp2(0x0e1013, FOG_DENSITY);   /* neutral grey, no hue 
 
 /* -------------------------------------------------------- ENVIRONMENT
    This is the single most important light in the scene and it is not a light.
-   The rig samples at metalness 0.88 / roughness 0.07 — a near-mirror. A metal
-   that smooth reflects its surroundings and almost nothing else, so with no
-   environment it renders as a black silhouette at ANY light intensity; the
-   spot and rim only ever give it a few specular pinpricks.
+   The rig's own MR map samples at metalness 0.96 / roughness 0.02 (medians,
+   measured off the texture) — a full mirror over the entire model. That is why
+   an environment was needed at all: a mirror reflects its surroundings and
+   almost nothing else. The material is no longer left that way (see MATERIAL,
+   at the loader), so the env's job is now reflections and wrap-around fill
+   rather than being the light source of last resort.
 
    The env is generated at runtime with PMREMGenerator from the same palette
    and the same vertical gradient as the backdrop shell above, so what the
@@ -219,13 +229,14 @@ scene.fog = new THREE.FogExp2(0x0e1013, FOG_DENSITY);   /* neutral grey, no hue 
    reflections have a bright edge to run along rather than a flat wash.
    No asset, no extra dependency.
 
-   ENV_INTENSITY is the exposure knob for the machine — reach for it before the
-   lights, since it is what the surface is actually made of. It went 15 -> 2.5:
-   the canopy is a wide, nearly flat mirror seen at a grazing angle, so it was
-   sampling the env's bright upper hemisphere across its whole face and blowing
-   out to a flat green disc. At 2.5 it reads as dark metal with a hot rim, which
-   is what gives the top of the frame any form at all. */
-const ENV_INTENSITY = 3.4;
+   ENV_INTENSITY went 3.4 -> 1.6. It was tuned when the model was left as a
+   near-mirror, where the environment was doing nearly all of the lighting and
+   had to be pushed hard to make the metal visible at all. With the material
+   remapped to a real surface (see MATERIAL, at the loader) the env is back to
+   what it should be — reflections and soft wrap-around fill, not the primary
+   light. At 3.4 against a diffuse surface it washes the basecolor straight
+   out. */
+const ENV_INTENSITY = 1.6;
 {
   const envScene = new THREE.Scene();
   const shell = new THREE.Mesh(
@@ -388,12 +399,23 @@ const GREEN_RAMP = `
 /* Screen footage is graded onto the §2 tiers so arbitrary stock clips still
    leave green as the only hue in the viewport. Set HERO_ASSETS.screenGrade
    to 0 for raw footage colour. */
-/* SCREEN_GAIN is what stops the panels leading the frame. They were rendering
-   at full value and dominating everything; they are panels in a dark room, not
-   light sources. The ramp drive is pulled down too (1.15 -> 0.62) so mid
-   luminance lands in the ramp's dark tiers instead of at the top — that top-end
-   landing was what crushed every clip to the same flat bright green. */
-const SCREEN_GAIN = { value: 0.26 };
+/* The panels were unreadable — you could not tell there was video on them at
+   all. Two things were doing it and both are backed off here.
+
+   SCREEN_GAIN 0.26 -> 0.70. Gain multiplies in LINEAR space and the panels opt
+   out of tone mapping, so 0.26 lands at 0.26^(1/2.2) = 0.54 of full value on
+   screen — dimmer still once the vignette and contrast curve have had it. 0.70
+   rather than higher: at 0.85 a bright clip's sky clipped flat and the panels
+   started outshining the machine again.
+
+   SCREEN_RAMP_DRIVE 0.62 -> 1.0. This is the one that actually hid the footage:
+   it scales luminance before the tier lookup, so at 0.62 a mid-grey pixel
+   (l 0.5) resolved at ramp position 0.31 — down in #0a3d1f, near-black. Every
+   clip collapsed into the ramp's two darkest tiers and the image inside them
+   went with it. At 1.0 mid-grey sits at #148f43->#19e65a and the content
+   reads. They are still emissive panels on a dark rig, not the subject. */
+const SCREEN_GAIN = { value: 0.70 };
+const SCREEN_RAMP_DRIVE = 1.0;
 const uGrade = { value: ASSETS.screenGrade ?? 1 };
 function screenMaterial(tex) {
   /* fog:false — hazing the panels would eat the contrast that keeps their
@@ -407,7 +429,7 @@ function screenMaterial(tex) {
       `#include <map_fragment>
        {
          float l = pow(clamp(dot(diffuseColor.rgb, vec3(0.2126,0.7152,0.0722)), 0.0, 1.0), 1.0 / 2.2);
-         vec3 graded = pow(greenRamp(clamp(l * 0.62, 0.0, 1.0)), vec3(2.2));
+         vec3 graded = pow(greenRamp(clamp(l * ${SCREEN_RAMP_DRIVE.toFixed(2)}, 0.0, 1.0)), vec3(2.2));
          diffuseColor.rgb = mix(diffuseColor.rgb, graded, uGrade) * uGain;
        }`
     );
@@ -630,21 +652,47 @@ new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
     rigBody.position.y = domeYatRadius(rXZ) - size.y / 2;
     ORBIT_Y = rigBody.position.y;                /* == the model's centre, the new orbit centre */
 
-    /* Self-illuminated veins. The machine should light itself rather than only
-       being lit from outside — that is what reads as "energy machine" instead
-       of "green statue". There is no separate emissive map, so the brightest
-       parts of the basecolor become the emitter: luminance raised to a power so
-       only the top of the range survives, then pushed through the §2 accent.
-       (Removed — see the note at the material below.) */
+    /* ------------------------------------------------------------ MATERIAL
+       The basecolor map is the model's design. Nothing here tints it, adds to
+       it or glows it — the one thing that happens is that the surface is made
+       able to SHOW it.
+
+       Why that is needed: the asset is a Tripo bake, and its metallic-roughness
+       map is degenerate. Measured over the whole 1024² texture, metalness is
+       0.876 mean / 0.961 median and roughness 0.068 mean / 0.020 median — one
+       flat near-perfect mirror across every part of the machine, panels, cables
+       and hub alike. A metal surface has no diffuse response at all, so under
+       ANY light a metalness-0.96 surface returns the environment, not its own
+       colour, tinted by the basecolor at grazing incidence only. That is the
+       blown, wet, hotspot-down-the-spine read — it was never lighting alone.
+
+       So the map is kept, for its variation, and remapped: metalness scaled
+       down to a faint sheen and roughness lifted out of mirror territory into a
+       satin band. Same texture, same detail, but the basecolor is now what the
+       white lights land on and come back from. Nothing else about the PBR is
+       touched — no emissive, no tint, no accent multiply. */
+    const METALNESS_SCALE = 0.15;   /* 0.96 map median -> 0.14: sheen, not chrome */
+    const ROUGH_FLOOR     = 0.42;   /* what a map value of 0 becomes */
+    const ROUGH_CEIL      = 0.90;   /* what a map value of 1 becomes */
+
     const maxAniso = renderer.capabilities.getMaxAnisotropy();
     let glbMesh = null;
     model.traverse(o => {
       if (!o.isMesh || !o.material) return;
       o.material.envMapIntensity = ENV_INTENSITY;
-      /* No emissive injection. It was pushing the basecolor through the accent
-         and adding a forced green glow on top of the GLB's own PBR — exactly
-         the "green multiply" that flattened the material. The maps are left to
-         speak for themselves. */
+      /* The remap. Both chunks define their factor as `scalar * map channel`,
+         so appending after the include rewrites the sampled value itself and
+         the texture's variation survives the transform. */
+      o.material.onBeforeCompile = shader => {
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <roughnessmap_fragment>',
+            `#include <roughnessmap_fragment>
+             roughnessFactor = mix(${ROUGH_FLOOR.toFixed(2)}, ${ROUGH_CEIL.toFixed(2)}, roughnessFactor);`)
+          .replace('#include <metalnessmap_fragment>',
+            `#include <metalnessmap_fragment>
+             metalnessFactor *= ${METALNESS_SCALE.toFixed(2)};`);
+      };
+      o.material.customProgramCacheKey = () => 'rig-mr-remap';
       o.material.needsUpdate = true;
       for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap']) {
         if (o.material[k]) { o.material[k].anisotropy = maxAniso; o.material[k].needsUpdate = true; }
@@ -952,6 +1000,7 @@ if (TUNE) {
   window.__cam = camera;
   window.__controls = controls;
   window.__renderer = renderer;
+  window.__composer = composer;   /* lets a QA capture force a frame without the rAF loop */
   window.__film = filmPass;      /* .enabled = false to preview with no grain */
   window.__bloom = bloomPass;
   window.__grade = gradePass;
