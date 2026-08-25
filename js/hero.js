@@ -536,6 +536,23 @@ const FACE_MIN_RADIUS = 0.45;   /* mesh-local; excludes the hub and inner arms *
 const FACE_SLAB       = 0.032;  /* mesh-local half-thickness of the modal plane */
 const FACE_TRIM       = 0.01;   /* drop this fraction of outliers off each in-plane edge */
 const VIDEO_ASPECT    = 16 / 9;
+/* Top of the source clip to drop before it is mapped onto a face.
+   The code clip (Pexels 2278095, screen 3) carries a bright gradient baked
+   across the top of its frame. Measured on the decoded video: mean row
+   luminance 157 at the very top against a body of 23-29, decaying to 96 by 6%
+   down, 47 by 12% and only merging with content around 18%. It is in every
+   frame of the loop, not one bad frame — sampled at t=1.7s, 51.4s and 53.9s it
+   is identical to the digit. The §2 grade maps 157/255 straight into the ramp's
+   bright tiers, so it rendered as a lit green bar across the top of that panel.
+   It is the clip, not the geometry. The other three clips are flat across their
+   top (row 0 vs body: 111/95, 96/71, 40/37), and all four faces extract to the
+   same 0.78 x 0.63 with the same cover-fit — there is nothing different about
+   that card except what is playing on it.
+   Applied to all four so the set stays consistent; on the nature clips it is
+   just a slightly tighter frame. Both axes are scaled by the same factor, so
+   the aspect is untouched and nothing stretches. Set to 0 when real screen
+   finals land in assets-final/ and this stops being needed. */
+const SCREEN_TOP_CROP = 0.14;
 /* order fixes which clip lands on which face; index 2 (X-Z-) is the intro anchor */
 const QUADRANTS = [[1, -1], [1, 1], [-1, -1], [-1, 1]];
 
@@ -625,11 +642,19 @@ function extractScreenFaces(mesh) {
     const sx = faceAspect < VIDEO_ASPECT ? faceAspect / VIDEO_ASPECT : 1;
     const sy = faceAspect < VIDEO_ASPECT ? 1 : VIDEO_ASPECT / faceAspect;
 
+    /* The sampled window, after the top crop. `zoom` shrinks it on BOTH axes by
+       the same factor so the cover-fit above still holds and the image cannot
+       stretch; `vMid` slides what is left down off the top of the frame.
+       Texture v = 1 is the top of the video and the face's v basis points up,
+       so dropping the top of the clip means keeping v in [0, 1 - crop]. */
+    const zoom = 1 - SCREEN_TOP_CROP;
+    const vMid = 0.5 - SCREEN_TOP_CROP / 2;
+
     const UV = new Float32Array(kept.length * 6);
     for (let i = 0, j = 0; i < P.length; i += 3) {
       tmp.set(P[i], P[i + 1], P[i + 2]);
-      UV[j++] = 0.5 + ((tmp.dot(u) - u0) / w - 0.5) * sx;
-      UV[j++] = 0.5 + ((tmp.dot(v) - v0) / hgt - 0.5) * sy;
+      UV[j++] = 0.5  + ((tmp.dot(u) - u0) / w   - 0.5) * sx * zoom;
+      UV[j++] = vMid + ((tmp.dot(v) - v0) / hgt - 0.5) * sy * zoom;
     }
 
     const g = new THREE.BufferGeometry();

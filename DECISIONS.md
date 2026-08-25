@@ -769,3 +769,55 @@ Verified with the loop running:
 
 `camera.position.y` is now constant for the entire lifetime of the page, from the
 first rendered frame onward.
+
+## 7.14 · The "broken card" was the clip, not the card
+
+Reported as the video sitting in the wrong position on one panel: a bright green
+bar across the top of the code screen. Checked the geometry first, because that
+is what the last four sections had been touching.
+
+**The geometry is fine, and all four faces are equivalent.** Extracted face,
+per quadrant, before the percentile trim:
+
+| face | modal plane | tris in slab | height |
+|---|---|---|---|
+| 0 | 0.7065 | 1385 | 0.983 (trimmed to 0.624) |
+| 1 | 0.6967 | 5675 | 0.632 |
+| 2 | 0.7004 | 1219 | 0.625 |
+| 3 | 0.6957 | 1297 | 0.627 |
+
+All four trim to ~0.78 x 0.63, all four take the same cover-fit, and rendering
+the suspect face with a UV-ramp material showed the mesh covering the panel
+corner to corner with v running 0 at the bottom to 1 at the top. Nothing about
+that card is different.
+
+**It is the footage.** Decoding the clip and measuring mean row luminance:
+
+| depth into frame | 0% | 2% | 4% | 6% | 8% | 12% | 18% | body |
+|---|---|---|---|---|---|---|---|---|
+| clip 2278095 (screen 3) | **157** | 139 | 118 | 96 | 71 | 47 | 32 | 23-29 |
+
+A bright gradient baked across the top of every frame — sampled at t=1.7s,
+51.4s and 53.9s it is identical to the digit, so it is the clip's content and
+not a decode artefact or one bad frame. The §2 grade maps 157/255 straight into
+the ramp's bright tiers, which is why it rendered as a lit bar. The other three
+clips are flat across their top — row 0 against body: 111/95, 96/71, 40/37.
+
+**Fix: `SCREEN_TOP_CROP` 0.14.** The window sampled out of every clip drops its
+top 14%. Both axes are scaled by the same factor, so the cover-fit still holds
+and nothing stretches — the crop just frames tighter. Applied to all four rather
+than to the one index, so the set stays consistent and there is no per-asset
+special case in the extractor; on the nature clips it is an unnoticeable
+reframe. Set it to 0 when real screen finals land in `assets-final/`.
+
+Verified on the rendered frame: the top 6% of the panel now measures mean
+luminance **13.3** against **14.6** across its middle — the top is no longer the
+brightest thing on the card. Before, that band was.
+
+Worth knowing for later: the extractor's outlier trim leaves a few triangles on
+the side pillars and the base in every face — visible as stray patches in the
+UV-ramp render. They are within the same depth slab and get valid UVs, so they
+show small pieces of video off the panel. Measured, the effect on the UV extent
+is the same across all four faces (width inflation 5-16%, height 11-15%), so it
+is not what caused this report and tightening it would risk clipping real face
+edges on the other three. Left alone deliberately.
