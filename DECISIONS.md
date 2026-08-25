@@ -336,3 +336,72 @@ the `assets-final/*.mp4` probe instead of 404ing four times per load.
 use `getWorldPosition` / `getWorldQuaternion` because the screens live two groups
 deep instead of directly in the scene. Same rule, same resulting pose — without
 this the dolly would aim at a local coordinate and start in the wrong place.
+
+## 7.5 · Screens are cut from the mesh, not laid over it
+
+The PlaneGeometry overlays are gone, along with every hardcoded screen
+transform. A flat plane can never line up with these display faces: they are
+tilted, non-axis-aligned quads, so any plane fitted to them sits slightly
+crooked and spills past the bezel no matter how well the transform is measured.
+
+The GLB offers no way to do this the easy way. Re-confirmed on the loaded scene
+graph: one mesh, `tripo_node_148553b5-...`, 149,812 tris, **zero draw groups**,
+one material — so there is no screen sub-mesh whose material could be swapped.
+Its `TEXCOORD_0` spans u 0..1 and v 0..1 over the *entire* model (a single
+atlas), so the mesh's own UVs cannot carry a video either.
+
+What it does have is the display faces themselves, as real triangles. So the
+screens are now built from those triangles' actual vertex positions:
+
+- per XZ-diagonal quadrant, keep triangles whose centroid is beyond
+  FACE_MIN_RADIUS, whose geometric normal points outward along the diagonal
+  (dot >= 0.88), and whose depth along it falls within FACE_SLAB of the modal
+  plane. Measured: all four faces peak at ~0.70 mesh-local with the bulk inside
+  +-0.03 — one flat plane, no recessed bezel.
+- reject in-plane outliers by percentile (FACE_TRIM) before measuring anything.
+  This matters more than it looks: a few stray coplanar triangles off to one
+  side would stretch the (u,v) extent the UVs normalise against, shifting and
+  shrinking the video across the whole panel.
+- UVs are a planar projection onto the face's own basis, **cover-fit** rather
+  than stretched — the face is ~1.24:1 and the footage is 16:9, so filling by
+  stretching would smear the code text sideways.
+- the result is added as a child of the GLB mesh, so the two share a transform
+  exactly and cannot drift.
+
+Because the geometry *is* the face, spill is not something that had to be tuned
+out — there is no longer a separate quad to misalign. Verified by flat-shading
+the extracted geometry against the model: the panel is a clean rectangle that
+stops at the bezel.
+
+Note `FACE_NORMAL_MIN` was briefly 0.95 and that was too strict — it rejected
+triangles near the top of the panel where the surface curves slightly, chewing
+a sawtooth into the top edge. 0.88 plus the percentile trim is the right split
+of labour: the normal test finds the face, the trim removes the strays.
+
+## 7.6 · Resolution — the real cause of the blur
+
+`HERO_DPR` was hard-capped at 1.0, but raising it to `devicePixelRatio` alone
+would not have fixed anything. `#scene3d` is 1024 CSS px wide inside a `#page`
+that chrome.js scales by `viewportWidth / 1024`, so `container.clientWidth`
+always reports 1024 while the canvas is *displayed* ~1.4x larger than that on a
+1440 viewport. The backing store has to cover design scale **and** device ratio:
+
+```
+heroPixelRatio() = min(devicePixelRatio * window.__SCALE, 2)
+```
+
+Measured at a 1440 viewport: pixel ratio 1.40625, backing store 1440x884,
+canvas CSS width 1440 — exactly 1:1, where before it was a 1024-wide buffer
+stretched over 1440 pixels. A plain `resize` listener was added alongside the
+ResizeObserver because `rescale()` changes `__SCALE` without changing
+`clientWidth`, so the observer never fires on a pure scale change.
+
+Also on sharpness: the stock clips were the 640x360 SD cuts, which visibly
+pixelate on a face that is ~800 device px wide — swapped for 1280x720. Model
+textures and video textures both get `anisotropy = getMaxAnisotropy()`.
+
+Bloom landed at strength 0.45 / radius 0.18 / threshold 0.72. Threshold 0.85
+was tried and is too far: the machine went black, because the old look was
+leaning on bloom at threshold 0.2 to fake surface brightness. The right lever
+for that is `ENV_INTENSITY`, which went 5 -> 15 — that brightens the metal's
+actual reflections, which is crisp, instead of adding glow, which is not.

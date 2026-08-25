@@ -39,12 +39,14 @@ window.HERO_ASSETS = {
   finalScreens: false,
   /* Screen footage until finals land: free Pexels stock (Pexels licence — free
      to use, no attribution required). CORS-enabled, which a WebGL video texture
-     requires. Swap any URL freely; each falls back to its local loop offline. */
+     requires. 1280x720, not the 640x360 SD cuts — at DPR 2 a display face is
+     ~800 device px wide and SD footage visibly pixelates on it.
+     Swap any URL freely; each falls back to its local loop offline. */
   stock: [
-    'https://videos.pexels.com/video-files/3576378/3576378-sd_640_360_25fps.mp4',
-    'https://videos.pexels.com/video-files/2098989/2098989-sd_640_360_30fps.mp4',
-    'https://videos.pexels.com/video-files/2278095/2278095-sd_640_360_30fps.mp4',
-    'https://videos.pexels.com/video-files/1851190/1851190-sd_640_360_25fps.mp4'
+    'https://videos.pexels.com/video-files/3576378/3576378-hd_1280_720_25fps.mp4',
+    'https://videos.pexels.com/video-files/2098989/2098989-hd_1280_720_30fps.mp4',
+    'https://videos.pexels.com/video-files/2278095/2278095-hd_1280_720_30fps.mp4',
+    'https://videos.pexels.com/video-files/1851190/1851190-hd_1280_720_25fps.mp4'
   ],
   screenGrade: 1,          /* 1 = graded onto the §2 green tiers, 0 = raw footage colour */
   finalDir: 'assets-final/',

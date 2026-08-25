@@ -50,8 +50,20 @@ camera.lookAt(0, 0, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance', stencil: false, depth: true });
 renderer.setClearColor(0x000000, 0);
-const HERO_DPR = 1.0;   /* hard cap — the grain/scanline aesthetic hides it */
-renderer.setPixelRatio(HERO_DPR);
+/* Resolution. This used to be hard-capped at 1.0, which is what made the whole
+   hero look soft — but device pixel ratio alone is not the whole story here.
+   #scene3d is 1024 CSS px wide inside a #page that chrome.js scales by
+   viewportWidth/1024, so container.clientWidth always reports 1024 while the
+   canvas is *displayed* 1.4x larger than that on a 1440 viewport. Rendering at
+   devicePixelRatio would still leave a 1024-wide buffer stretched over 1440
+   pixels. The backing store has to cover design scale AND device ratio.
+   Capped at 2 so a hidpi phone does not quadruple the fill cost for nothing. */
+const HERO_DPR_CAP = 2;
+function heroPixelRatio() {
+  const pageScale = window.__SCALE || 1;          /* set by chrome.js rescale() */
+  return Math.min((window.devicePixelRatio || 1) * pageScale, HERO_DPR_CAP);
+}
+renderer.setPixelRatio(heroPixelRatio());
 renderer.setSize(container.clientWidth, container.clientHeight);
 /* The rig is the first textured PBR asset in this scene, so the output chain
    finally has to be right: sRGB out, ACES filmic in. Tone mapping applies to
@@ -89,7 +101,7 @@ scene.add(fillLight);
    dependency): a dark-to-accent vertical gradient plus a mint-white key card
    where the spot sits, so every reflection the machine picks up is already in
    the palette. Tune ENV_INTENSITY, not the lights, to change how hot it reads. */
-const ENV_INTENSITY = 5.0;
+const ENV_INTENSITY = 15.0;
 {
   const envScene = new THREE.Scene();
   const shell = new THREE.Mesh(
@@ -210,8 +222,8 @@ function screenMaterial(tex) {
 
 function makeVideo(i, flip) {
   const name = NAMES[i];
-  /* final asset -> free stock URL -> local procedural loop. The last step is
-     offline-proof, so a blocked or rate-limited CDN never blocks the build. */
+  /* stock URL -> local procedural loop. HERO_ASSETS.finalScreens puts an
+     assets-final/ probe in front when real finals land. */
   const sources = [ASSETS.finalScreens ? FINAL + name : null, STOCK[i], PLACE + name].filter(Boolean);
   let step = 0;
 
@@ -230,56 +242,160 @@ function makeVideo(i, flip) {
 
   const tex = new THREE.VideoTexture(v);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
   if (flip) { tex.wrapS = THREE.RepeatWrapping; tex.repeat.x = -1; tex.offset.x = 1; }
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), screenMaterial(tex));
-  return { v, tex, mesh };
+  return { v, tex, mesh: null, centre: new THREE.Vector3(), normal: new THREE.Vector3() };
 }
 const NAMES = ASSETS.screens || ['screen-a.mp4', 'screen-b.mp4', 'screen-c.mp4', 'screen-d.mp4'];
 const STOCK = ASSETS.stock || [];
 
-/* Screen placement. The rig carries four monitor frames on arms that radiate
-   along the XZ diagonals, so the video planes are seated in those frames. Each
-   frame's front face was fitted from the mesh's own vertex normals — the subset
-   whose normal points outward along that quadrant's diagonal — which isolates
-   the flat screen face from the arm and bracket behind it.
-
-   Fitted with the model normalised to diagonal FIT_DIAG: face centre
-   (+-0.445, -0.087, +-0.453), face 0.708 x 0.572, canted 4.9 deg nose-down.
-   The planes are inset to 0.640 x 0.500 so they sit inside the bezel, and
-   pushed 0.063 out along the face normal — the bezel relief stands ~0.048
-   proud of the fitted plane, so any less and the frame pokes through the video.
-
-   Everything is expressed as fitted-value x K, so RIG_TARGET_DIAG is a real
-   knob: retune it and the screens scale with the model instead of tearing off.
-   Positions are relative to the model's bbox centre = rigBody's local origin.
-
-   CAVEAT: the GLB is one fused mesh (1 node, 1 material, 0 draw groups) with no
-   separable bezel nodes, so these planes cannot be parented to real screen
-   geometry. The transforms are measured off the mesh, not hand-placed. */
-const FIT_DIAG = 2.8;
-const K = RIG_TARGET_DIAG / FIT_DIAG;
-const SP = 0.086;                       /* the frames' own downward cant */
-const PX = 0.489 * K, PY = -0.092 * K, PZ = 0.497 * K;
-const SW = 0.640 * K, SH = 0.500 * K;
-
-const s1 = makeVideo(0);          /* faces X+ Z- */
-s1.mesh.scale.set(SW, SH, 1); s1.mesh.position.set(PX, PY, -PZ); s1.mesh.rotation.set(SP, 2.358, 0, 'YXZ');
-const s2 = makeVideo(1);          /* faces X+ Z+ */
-s2.mesh.scale.set(SW, SH, 1); s2.mesh.position.set(PX, PY, PZ); s2.mesh.rotation.set(SP, 0.781, 0, 'YXZ');
-const s3 = makeVideo(2);          /* faces X- Z- — the intro dollies out from this one */
-s3.mesh.scale.set(SW, SH, 1); s3.mesh.position.set(-PX, PY, -PZ); s3.mesh.rotation.set(SP, -2.358, 0, 'YXZ');
-const s4 = makeVideo(3, true);    /* faces X- Z+ */
-s4.mesh.scale.set(SW, SH, 1); s4.mesh.position.set(-PX, PY, PZ); s4.mesh.rotation.set(SP, -0.781, 0, 'YXZ');
-const screens = [s1, s2, s3, s4];
+/* Video elements exist immediately — the preloader races on s3's readyState —
+   but the meshes do not; they come out of the GLB. See extractScreenFaces. */
+const screens = [makeVideo(0), makeVideo(1), makeVideo(2), makeVideo(3, true)];
+const s3 = screens[2];   /* face square to the idle camera; the intro dollies out from it */
 function safePlay() { screens.forEach(s => s.v.play().catch(() => {})); }
 
+/* ------------------------------------------------ SCREEN FACE EXTRACTION
+   No PlaneGeometry overlays, no hardcoded transforms.
+
+   The GLB is one fused mesh — a single node, a single material, zero draw
+   groups — so there is no screen sub-mesh whose material could simply be
+   swapped, and its UVs are a single atlas spanning the whole model (u and v
+   both 0..1 over everything), so they cannot carry a video either. What the
+   mesh does have is the four display faces themselves, as real triangles.
+
+   So pull those triangles out and build the screen geometry from their actual
+   vertex positions. Because the result *is* the face, the video cannot sit
+   crooked and cannot spill past the bezel — there is no separate quad left to
+   misalign. UVs are a planar projection onto the face's own basis.
+
+   Selection, per XZ-diagonal quadrant: a triangle qualifies when its centroid
+   lies in that quadrant beyond FACE_MIN_RADIUS, its geometric normal points
+   outward along the diagonal, and its depth along that diagonal falls in the
+   modal slab. Measured on this asset: all four faces peak at ~0.70 in mesh-
+   local units with the bulk inside +-0.03 — one flat plane, no recessed bezel.
+
+   All of this is in the GLB mesh's own local space, and the result is added as
+   its child, so the two share a transform exactly and can never drift apart. */
+const FACE_NORMAL_MIN = 0.88;   /* dot(faceNormal, outwardDiagonal) */
+const FACE_MIN_RADIUS = 0.45;   /* mesh-local; excludes the hub and inner arms */
+const FACE_SLAB       = 0.032;  /* mesh-local half-thickness of the modal plane */
+const FACE_TRIM       = 0.01;   /* drop this fraction of outliers off each in-plane edge */
+const VIDEO_ASPECT    = 16 / 9;
+/* order fixes which clip lands on which face; index 2 (X-Z-) is the intro anchor */
+const QUADRANTS = [[1, -1], [1, 1], [-1, -1], [-1, 1]];
+
+function extractScreenFaces(mesh) {
+  const geo = mesh.geometry, pos = geo.attributes.position, idx = geo.index;
+  const triCount = (idx ? idx.count : pos.count) / 3;
+  const vi = i => (idx ? idx.getX(i) : i);
+  const buckets = QUADRANTS.map(() => []);
+
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), nrm = new THREE.Vector3();
+
+  for (let t = 0; t < triCount; t++) {
+    const i0 = vi(t * 3), i1 = vi(t * 3 + 1), i2 = vi(t * 3 + 2);
+    a.fromBufferAttribute(pos, i0); b.fromBufferAttribute(pos, i1); c.fromBufferAttribute(pos, i2);
+    const gx = (a.x + b.x + c.x) / 3, gz = (a.z + b.z + c.z) / 3;
+    if (Math.hypot(gx, gz) < FACE_MIN_RADIUS) continue;
+    const q = QUADRANTS.findIndex(([sx, sz]) => Math.sign(gx) === sx && Math.sign(gz) === sz);
+    if (q < 0) continue;
+    const ox = QUADRANTS[q][0] / Math.SQRT2, oz = QUADRANTS[q][1] / Math.SQRT2;
+    e1.subVectors(b, a); e2.subVectors(c, a); nrm.crossVectors(e1, e2).normalize();
+    if (nrm.x * ox + nrm.z * oz < FACE_NORMAL_MIN) continue;
+    buckets[q].push([i0, i1, i2, gx * ox + gz * oz, nrm.x, nrm.y, nrm.z]);
+  }
+
+  return buckets.map(tris => {
+    if (!tris.length) return null;
+    /* modal depth = the display plane, as opposed to the arm and the outer rim */
+    const depths = tris.map(t => t[3]).sort((x, y) => x - y);
+    const lo = depths[0], hi = depths[depths.length - 1], BINS = 40;
+    const h = (hi - lo) / BINS || 1, hist = new Array(BINS).fill(0);
+    depths.forEach(d => hist[Math.min(BINS - 1, Math.floor((d - lo) / h))]++);
+    let best = 0; for (let i = 1; i < BINS; i++) if (hist[i] > hist[best]) best = i;
+    const plane = lo + (best + 0.5) * h;
+    const face = tris.filter(t => Math.abs(t[3] - plane) <= FACE_SLAB);
+    if (face.length < 8) return null;
+
+    /* average normal, then an in-plane basis: v is up flattened onto the plane,
+       u completes the right-handed pair */
+    const n = new THREE.Vector3();
+    face.forEach(t => n.add(new THREE.Vector3(t[4], t[5], t[6])));
+    n.normalize();
+    const v = new THREE.Vector3(0, 1, 0).addScaledVector(n, -n.y).normalize();
+    const u = new THREE.Vector3().crossVectors(v, n).normalize();
+
+    /* Trim in-plane outliers before anything else. A handful of stray triangles
+       at the same depth but off to one side would otherwise do real damage:
+       they stretch the (u,v) extent the UVs normalise against, which shifts and
+       shrinks the video across the whole panel. Percentile bounds, not min/max. */
+    const tmp = new THREE.Vector3();
+    const cu = [], cv = [];
+    for (const t of face) {
+      tmp.set(0, 0, 0);
+      for (const i of [t[0], t[1], t[2]]) {
+        const q = new THREE.Vector3().fromBufferAttribute(pos, i);
+        tmp.add(q);
+      }
+      tmp.multiplyScalar(1 / 3);
+      t[7] = tmp.dot(u); t[8] = tmp.dot(v);
+      cu.push(t[7]); cv.push(t[8]);
+    }
+    const pct = (arr, f) => { const a = arr.slice().sort((x, y) => x - y);
+      return a[Math.min(a.length - 1, Math.max(0, Math.round(f * (a.length - 1))))]; };
+    const uLo = pct(cu, FACE_TRIM), uHi = pct(cu, 1 - FACE_TRIM);
+    const vLo = pct(cv, FACE_TRIM), vHi = pct(cv, 1 - FACE_TRIM);
+    const padU = (uHi - uLo) * 0.06, padV = (vHi - vLo) * 0.06;
+    const kept = face.filter(t => t[7] >= uLo - padU && t[7] <= uHi + padU
+                               && t[8] >= vLo - padV && t[8] <= vHi + padV);
+    if (kept.length < 8) return null;
+
+    const P = new Float32Array(kept.length * 9);
+    let k = 0, u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+    for (const t of kept) {
+      for (const i of [t[0], t[1], t[2]]) {
+        tmp.fromBufferAttribute(pos, i);
+        P[k++] = tmp.x; P[k++] = tmp.y; P[k++] = tmp.z;
+        const du = tmp.dot(u), dv = tmp.dot(v);
+        if (du < u0) u0 = du; if (du > u1) u1 = du;
+        if (dv < v0) v0 = dv; if (dv > v1) v1 = dv;
+      }
+    }
+    const w = u1 - u0, hgt = v1 - v0;
+    /* cover-fit rather than stretch: the face is ~1.24:1 and the footage is
+       16:9, so filling it by stretching would smear the code text sideways.
+       Crop the overflow instead. */
+    const faceAspect = w / hgt;
+    const sx = faceAspect < VIDEO_ASPECT ? faceAspect / VIDEO_ASPECT : 1;
+    const sy = faceAspect < VIDEO_ASPECT ? 1 : VIDEO_ASPECT / faceAspect;
+
+    const UV = new Float32Array(kept.length * 6);
+    for (let i = 0, j = 0; i < P.length; i += 3) {
+      tmp.set(P[i], P[i + 1], P[i + 2]);
+      UV[j++] = 0.5 + ((tmp.dot(u) - u0) / w - 0.5) * sx;
+      UV[j++] = 0.5 + ((tmp.dot(v) - v0) / hgt - 0.5) * sy;
+    }
+
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(P, 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(UV, 2));
+    g.computeBoundingSphere();
+    return { geometry: g, normal: n, centre: g.boundingSphere.center.clone(),
+             tris: kept.length, dropped: face.length - kept.length, size: [w, hgt] };
+  });
+}
+
 /* ------------------------------------------------------------- THE RIG */
-/* World-space, because the screens now live two groups deep (rig > rigBody)
-   instead of directly in the scene. Same rule as before, same result — the
-   intro's start pose is unchanged. */
-function outwardNormal(mesh) {
-  const n = new THREE.Vector3(0, 0, 1).applyQuaternion(mesh.getWorldQuaternion(new THREE.Quaternion()));
-  if (n.dot(mesh.getWorldPosition(new THREE.Vector3())) < 0) n.negate();
+/* The face normal comes from the extracted geometry itself, so this is just a
+   local->world direction transform. Same rule as before, same resulting pose. */
+function outwardNormal(entry) {
+  const n = entry.normal.clone().transformDirection(entry.mesh.matrixWorld).normalize();
+  if (n.dot(entry.mesh.localToWorld(entry.centre.clone())) < 0) n.negate();
   return n;
 }
 
@@ -287,13 +403,10 @@ let modelReady;
 const modelP = new Promise(res => { modelReady = res; });
 function mountRig(obj) {
   if (obj) rigBody.add(obj);
-  /* Screens join the same body as the model. Their constants are already in
-     model-centred space, so they need no offset — and because they share a
-     parent with the model, nothing can slide out from under them again. */
-  screens.forEach(s => rigBody.add(s.mesh));
   safePlay();
   modelReady();
 }
+
 /* meshopt-compressed geometry — the decoder resolves through the same
    three/addons/ import-map prefix the rest of the scene uses. */
 new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
@@ -307,16 +420,52 @@ new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
     model.scale.y *= RIG_Y_STRETCH;
     model.updateMatrixWorld(true);
 
+    /* Measured BEFORE the screen meshes are parented in, so they cannot inflate
+       the box the ceiling alignment is computed from. */
     const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
     const c = box.getCenter(new THREE.Vector3());
-    /* bbox centre to rigBody's origin: the screen constants are measured from
-       exactly this point, and rigBody is what spins. */
-    model.position.sub(c);
-    /* then hang the whole body so the model's top touches the ceiling exactly */
-    rigBody.position.y = CEILING_Y - box.getSize(new THREE.Vector3()).y / 2;
+    model.position.sub(c);                       /* bbox centre -> rigBody origin, X/Z on axis */
+    rigBody.position.y = CEILING_Y - size.y / 2; /* bbox top -> exactly CEILING_Y */
 
-    model.traverse(o => { if (o.isMesh && o.material) o.material.envMapIntensity = ENV_INTENSITY; });
+    const maxAniso = renderer.capabilities.getMaxAnisotropy();
+    let glbMesh = null;
+    model.traverse(o => {
+      if (!o.isMesh || !o.material) return;
+      o.material.envMapIntensity = ENV_INTENSITY;
+      for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap']) {
+        if (o.material[k]) { o.material[k].anisotropy = maxAniso; o.material[k].needsUpdate = true; }
+      }
+      if (!glbMesh || o.geometry.attributes.position.count > glbMesh.geometry.attributes.position.count) glbMesh = o;
+    });
+
+    /* the video surfaces, cut from the mesh's own display faces */
+    if (glbMesh) {
+      const faces = extractScreenFaces(glbMesh);
+      faces.forEach((f, i) => {
+        if (!f) { console.error('[hero] no display face found for screen', i + 1); return; }
+        const m = new THREE.Mesh(f.geometry, screenMaterial(screens[i].tex));
+        /* coplanar with the face it was cut from — offset in depth, not in space */
+        m.material.polygonOffset = true;
+        m.material.polygonOffsetFactor = -2;
+        m.material.polygonOffsetUnits = -2;
+        glbMesh.add(m);
+        screens[i].mesh = m;
+        screens[i].normal.copy(f.normal);
+        screens[i].centre.copy(f.centre);
+      });
+      console.log('[hero] screen faces:', faces.map((f, i) =>
+        f ? `s${i + 1} ${f.tris} tris (-${f.dropped} outliers) ${f.size[0].toFixed(3)}x${f.size[1].toFixed(3)}` : `s${i + 1} MISSING`).join(' | '));
+    }
+
     mountRig(model);
+
+    /* assert the mount is flush — computed, not eyeballed */
+    rig.updateMatrixWorld(true);
+    const worldTop = new THREE.Box3().setFromObject(model).max.y;
+    const gap = worldTop - CEILING_Y;
+    console.log(`[hero] model bbox.max.y = ${worldTop.toFixed(6)}  CEILING_Y = ${CEILING_Y.toFixed(6)}  gap = ${gap.toFixed(6)}`);
+    if (Math.abs(gap) > 1e-4) console.error('[hero] ceiling gap is not zero:', gap);
   },
   undefined,
   err => {
@@ -352,9 +501,9 @@ const minLoaderP = new Promise(res => setTimeout(res, 650));      /* fast, not a
 Promise.all([Promise.race([Promise.all([modelP, heroVideoP]), timeoutP]), minLoaderP]).then(() => {
   try {
     rig.updateMatrixWorld(true);
-    const normal = outwardNormal(s3.mesh);
+    const normal = outwardNormal(s3);
     const dist = (0.65 / 2) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.1;
-    s3.mesh.getWorldPosition(introFromLook);
+    introFromLook.copy(s3.mesh.localToWorld(s3.centre.clone()));
     introFromPos.copy(introFromLook).addScaledVector(normal, dist);
     camera.position.copy(introFromPos);
     camera.lookAt(introFromLook);
@@ -396,10 +545,17 @@ composer.addPass(new RenderPass(scene, camera));
 /* BokehPass is gone. Its depth-of-field was the mush over the whole machine:
    focus 1.2 with the rig spanning ~0.9 in depth put most of the mesh outside
    the focal plane, so the geometry never resolved.
-   Bloom is pulled back hard as well — strength 0.8 -> 0.30, radius 0.6 -> 0.20,
-   threshold 0.2 -> 0.70. At threshold 0.2 almost every lit surface bloomed;
-   at 0.70 only the genuinely hot pixels do, so edges stay edges. */
-composer.addPass(new UnrealBloomPass(new THREE.Vector2(container.clientWidth, container.clientHeight), 0.30, 0.20, 0.70));
+   Bloom is pulled back hard as well — strength 0.8 -> 0.45, radius 0.6 -> 0.18,
+   threshold 0.2 -> 0.72. At threshold 0.2 almost every lit surface bloomed and
+   smeared; at 0.85 the machine went black. 0.72 blooms the highlights only, so
+   edges stay edges and screen text stays readable. Its buffer is sized in
+   device pixels to match the real pixel ratio. */
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(container.clientWidth * heroPixelRatio(), container.clientHeight * heroPixelRatio()),
+  0.45,   /* strength  — was 0.8  */
+  0.18,   /* radius    — was 0.6, tight so it never softens an edge */
+  0.72);  /* threshold — was 0.2; only genuine highlights bloom now */
+composer.addPass(bloomPass);
 /* Grain kept at a whisper, scanlines off entirely (they were the crawl). Set
    FILM_STRENGTH to 0 to drop the pass's contribution completely. */
 const FILM_STRENGTH = 0.10;
@@ -412,10 +568,25 @@ new ResizeObserver(() => {
   if (!w || !h) return;
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  renderer.setPixelRatio(HERO_DPR);
+  const pr = heroPixelRatio();
+  renderer.setPixelRatio(pr);
+  renderer.setSize(w, h);
+  /* EffectComposer multiplies by the renderer's pixel ratio internally, so it
+     gets the CSS size here — passing device px would square the ratio. */
+  composer.setSize(w, h);
+  bloomPass.setSize(w * pr, h * pr);
+}).observe(container);
+/* chrome.js rescale() changes __SCALE without changing container.clientWidth,
+   so the ResizeObserver never fires — watch the window too. */
+addEventListener('resize', () => {
+  const w = container.clientWidth, h = container.clientHeight;
+  if (!w || !h) return;
+  const pr = heroPixelRatio();
+  renderer.setPixelRatio(pr);
   renderer.setSize(w, h);
   composer.setSize(w, h);
-}).observe(container);
+  bloomPass.setSize(w * pr, h * pr);
+});
 
 /* -------------------------------------------------------- RENDER LOOP */
 let visible = true;
@@ -465,48 +636,18 @@ function animate() {
 animate();
 
 /* ------------------------------------------------------------ TUNE MODE
-   Dev-only screen placement, ?tune=1. Nothing below binds a listener or
-   touches the scene unless the flag is present.
-     1-4          select a screen
-     arrows       translate in the screen's own plane (Up/Down = its up axis)
-     shift+arrows rotate (Left/Right = yaw, Up/Down = pitch)
-     [ / ]        scale down / up
-     P            log the current transform as paste-ready .set(...) lines
-*/
+   Dev inspection only, ?tune=1. There is nothing left to nudge — the screens
+   are geometry cut from the GLB's own display faces, so their placement is not
+   adjustable by transform any more. This just exposes the handles.
+   Nothing below runs unless the flag is present. */
 if (TUNE) {
-  window.__screens = [s1, s2, s3, s4];
+  window.__screens = screens;
   window.__rig = rig;
   window.__rigBody = rigBody;
-  window.__film = filmPass;       /* .enabled = false to preview with no grain */
-  window.__cam = camera;          /* dev inspection only */
+  window.__cam = camera;
   window.__controls = controls;
-  let sel = 0;
-  const STEP = 0.005, ROT = 0.005, SCL = 1.02;
-  const log = () => {
-    const m = screens[sel].mesh, p = m.position, r = m.rotation, c = m.scale;
-    console.log(
-      `s${sel + 1}.mesh.scale.set(${c.x.toFixed(3)}, ${c.y.toFixed(3)}, 1); ` +
-      `s${sel + 1}.mesh.position.set(${p.x.toFixed(3)}, ${p.y.toFixed(3)}, ${p.z.toFixed(3)}); ` +
-      `s${sel + 1}.mesh.rotation.set(${r.x.toFixed(3)}, ${r.y.toFixed(3)}, ${r.z.toFixed(3)}, 'YXZ');`
-    );
-  };
-  addEventListener('keydown', e => {
-    if (e.key >= '1' && e.key <= '4') { sel = +e.key - 1; console.log('[tune] screen', sel + 1); return; }
-    const m = screens[sel].mesh;
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(m.quaternion);
-    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(m.quaternion);
-    let hit = true;
-    switch (e.key) {
-      case 'ArrowLeft':  e.shiftKey ? m.rotation.y -= ROT : m.position.addScaledVector(right, -STEP); break;
-      case 'ArrowRight': e.shiftKey ? m.rotation.y += ROT : m.position.addScaledVector(right, STEP); break;
-      case 'ArrowUp':    e.shiftKey ? m.rotation.x -= ROT : m.position.addScaledVector(up, STEP); break;
-      case 'ArrowDown':  e.shiftKey ? m.rotation.x += ROT : m.position.addScaledVector(up, -STEP); break;
-      case '[': m.scale.x /= SCL; m.scale.y /= SCL; break;
-      case ']': m.scale.x *= SCL; m.scale.y *= SCL; break;
-      case 'p': case 'P': log(); break;
-      default: hit = false;
-    }
-    if (hit) e.preventDefault();
-  });
-  console.log('[tune] on — 1-4 select, arrows move, shift+arrows rotate, [ ] scale, P to log');
+  window.__renderer = renderer;
+  window.__film = filmPass;      /* .enabled = false to preview with no grain */
+  window.__bloom = bloomPass;
+  console.log('[tune] on — __screens/__rig/__rigBody/__cam/__controls/__renderer/__film/__bloom');
 }

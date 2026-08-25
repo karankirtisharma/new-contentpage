@@ -56,11 +56,18 @@ reflect. `hero.js` builds an environment map at runtime from the palette tokens
 (a gradient shell plus a key card) through `PMREMGenerator`. No asset, no extra
 dependency. `ENV_INTENSITY` is the exposure knob for the machine.
 
+**Screens are cut from the model.** There are no overlay planes. The GLB is one
+fused mesh with no screen sub-mesh and a whole-model UV atlas, so `hero.js`
+extracts each display face's actual triangles at load and builds the video
+surface from them, with a cover-fit planar UV projection. The geometry *is* the
+face, so the video cannot sit crooked or spill past the bezel.
+
 **Post chain**, in order: `RenderPass → UnrealBloomPass → FilmPass`. Bloom is
-deliberately restrained (strength 0.30, radius 0.20, threshold 0.70) so the
+deliberately restrained (strength 0.45, radius 0.18, threshold 0.72) so the
 geometry reads as geometry; `FILM_STRENGTH` is a whisper of grain with
-scanlines off. DPR is hard-capped at 1.0 — the canvas backing store stays
-1024×629 at every viewport.
+scanlines off. Resolution is `devicePixelRatio × pageScale`, capped at 2 —
+`#scene3d` is 1024 CSS px inside a scaled `#page`, so device ratio alone would
+still leave a stretched buffer.
 
 ## Assets
 
@@ -93,10 +100,10 @@ in the same process (see DECISIONS.md).
 
 ## Dev tools
 
-`?tune=1` exposes `__screens`, `__rig`, `__rigBody`, `__cam`, `__controls` and
-`__film`, and binds a keyboard nudger: `1`–`4` select a screen, arrows
-translate, shift+arrows rotate, `[`/`]` scale, `P` logs a paste-ready
-`.set(...)` line. Nothing binds when the flag is absent.
+`?tune=1` exposes `__screens`, `__rig`, `__rigBody`, `__cam`, `__controls`,
+`__renderer`, `__film` and `__bloom` for inspection. There is nothing left to
+nudge — screen placement is geometry, not a transform. Nothing runs when the
+flag is absent.
 
 `qa/shoot.mjs` drives headless Chrome over CDP and waits real wall-clock time
 (`--virtual-time-budget` doesn't advance `performance.now()`, which the intro is
