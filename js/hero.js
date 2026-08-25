@@ -68,6 +68,7 @@ const SCROLL_SPIN     = 0.0016; /* radians of rig.rotation.y per scrolled design
    angle the intro dolly lands on and the angle the orbit is now locked to.
    Retuning ORBIT_RISE or ORBIT_XZ moves the lock with it. */
 const ORBIT_POLAR     = Math.atan2(Math.hypot(ORBIT_XZ[0], ORBIT_XZ[1]), ORBIT_RISE);
+const ORBIT_RADIUS    = Math.hypot(ORBIT_XZ[0], ORBIT_XZ[1], ORBIT_RISE);
 
 let ORBIT_Y = 0;                /* machine centre in world Y; set when the rig loads */
 let CANOPY_R = 1.651;           /* canopy rim radius; re-measured when the rig loads */
@@ -809,6 +810,18 @@ Promise.all([Promise.race([Promise.all([modelP, heroVideoP]), timeoutP]), minLoa
     const dist = (0.65 / 2) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.1;
     introFromLook.copy(s3.mesh.localToWorld(s3.centre.clone()));
     introFromPos.copy(introFromLook).addScaledVector(normal, dist);
+    /* The dolly is FLATTENED onto the locked orbit height. Measured before this
+       line existed, it started 0.103 below the resting height and lifted its aim
+       0.111 over the four seconds — the last vertical motion in the scene, and
+       on every single load. Pinning both ends to the resting height makes
+       camera.position.y and the aim height constant from the very first frame:
+       the lerp has nothing to interpolate vertically, and the intro spin turns
+       about Y, which cannot change height either.
+       Nothing else about the intro moves — same push-out along s3's normal, same
+       4000ms, same easing, same spin blend. Delete these two lines to get the
+       vertical component back. */
+    introFromLook.y = introToLook.y;
+    introFromPos.y  = introToPos.y;
     camera.position.copy(introFromPos);
     camera.lookAt(introFromLook);
     controls.enabled = false;
@@ -978,6 +991,24 @@ new IntersectionObserver(e => {
 const introLookNow = new THREE.Vector3();
 const easeInOutCubic = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
+/* ------------------------------------------------------------- HEIGHT LOCK
+   Belt and braces on top of the min/max polar clamp. The clamp lives inside
+   OrbitControls and only covers what OrbitControls itself does to the camera;
+   this re-seats the camera onto its resting cone after every idle frame, so
+   NOTHING — a stray drag, damping overshoot, a future edit, a different three
+   version — can put it at another height. Cheap: two allocations at module
+   scope, and the write is skipped entirely when the camera is already there. */
+const _lockOff = new THREE.Vector3();
+const _lockSph = new THREE.Spherical();
+function lockCameraHeight() {
+  _lockSph.setFromVector3(_lockOff.copy(camera.position).sub(controls.target));
+  if (Math.abs(_lockSph.phi - ORBIT_POLAR) < 1e-9 && Math.abs(_lockSph.radius - ORBIT_RADIUS) < 1e-9) return;
+  _lockSph.phi = ORBIT_POLAR;
+  _lockSph.radius = ORBIT_RADIUS;
+  camera.position.copy(controls.target).add(_lockOff.setFromSpherical(_lockSph));
+  camera.lookAt(controls.target);
+}
+
 function animate() {
   requestAnimationFrame(animate);
   if (!sceneReady || !visible || document.hidden) return;
@@ -1003,6 +1034,7 @@ function animate() {
     /* manual idle spin — identical motion to the intro tail, so no velocity jump */
     if (!userHold) camera.position.sub(controls.target).applyAxisAngle(INTRO_UP, -SPIN_RATE * dt).add(controls.target);
     controls.update();
+    lockCameraHeight();
   }
 
   /* Scroll drives exactly one thing: the body's spin about its own vertical

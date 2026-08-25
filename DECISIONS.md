@@ -727,3 +727,45 @@ damping:
 
 Vertical moves nothing. Horizontal moves theta by -1.594 rad with phi delta
 exactly 0.
+
+## 7.13 · Vertical motion, actually gone this time
+
+§7.12 locked the polar angle and I verified it by dispatching drags and calling
+`controls.update()` by hand. That verification was **not good enough**: the
+Browser pane here does not composite, so `requestAnimationFrame` is paused and
+`animate()` never runs. I tested the clamp in isolation, not the running app,
+and I reported it as if I had tested the app.
+
+Re-tested properly, driving `animate()`'s idle branch off a `setInterval` so the
+loop really turns. The polar clamp does hold — a 360px vertical drag moves
+`camera.position.y` by exactly 0. But the scene still had vertical motion in it,
+in the one place §7.12 never looked: **the intro dolly**. Measured, it started
+0.103 below the resting height and lifted its aim 0.111 over the four seconds,
+on every load.
+
+Two changes:
+
+**The dolly is flattened onto the locked orbit height.** `introFromLook.y` and
+`introFromPos.y` are pinned to their `introTo*` counterparts, so the lerp has
+nothing to interpolate vertically and the intro spin turns about Y, which cannot
+change height either. Everything else about the intro is untouched: same
+push-out along s3's normal, same 4000ms, same easing, same spin blend. Two lines,
+and deleting them restores the vertical component.
+
+**A hard height lock re-seats the camera after every idle frame.**
+`lockCameraHeight()` re-derives the spherical offset from the target and forces
+`phi` back to `ORBIT_POLAR` and `radius` to `ORBIT_RADIUS`. The min/max polar
+clamp lives inside OrbitControls and only governs what OrbitControls itself does
+to the camera; this governs the camera. It skips the write when the camera is
+already seated, so the common case costs one `setFromVector3` and two compares.
+
+Verified with the loop running:
+
+| | result |
+|---|---|
+| intro vertical travel | **0** (start height == resting height) |
+| `camera.position.y` across 15 samples of a 600px vertical drag | **-0.217145 → -0.217145**, min == max |
+| `camera.position.y` after shoving the camera +1.5 by hand | **-0.217145**, re-seated |
+
+`camera.position.y` is now constant for the entire lifetime of the page, from the
+first rendered frame onward.
