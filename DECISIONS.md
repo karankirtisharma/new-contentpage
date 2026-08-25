@@ -934,3 +934,54 @@ the pixels BEFORE `toDataURL` and before any `await`. `preserveDrawingBuffer` is
 false, so the drawing buffer is cleared at the next yield and a `drawImage` after
 an awaited upload reads pure black. A whole sweep was silently zeroed this way
 before it was caught.
+
+## 7.17 · The mount is cut out of the scene, not framed out of it
+
+§7.16 refitted the lens to a supplied reference and noted the consequence: at
+FOV 34 the canopy and ceiling are back in frame, and no camera setting removes
+them without throwing away the composition. Confirmed by measurement before
+trying anything else — at FOV 34 the canopy's far rim needs a drop of ~0.88 to
+clear the top edge, which puts the machine's bottom at 40% of the frame.
+
+So the mount is removed from the scene.
+
+**Three things go, and only one of them is difficult.** The ceiling dome and the
+light shaft are their own meshes and simply stop being drawn. The canopy is
+fused into the single 149,812-triangle mesh, so it comes off with a clipping
+plane on that material (`renderer.localClippingEnabled`, per-material — a global
+plane would also slice the backdrop shell, which is 22 units out and would lose
+most of its visible height).
+
+**Where to cut was measured.** Max horizontal radius per world-Y band over the
+model's vertices:
+
+| y | max r | | y | max r |
+|---|---|---|---|---|
+| 0.60 | 0.11 | | 0.52 | 0.896 |
+| 0.58 | 1.168 | | 0.50 | 0.787 |
+| 0.56 | 1.167 | | **0.48** | **0.184** |
+| 0.54 | 0.994 | | 0.46 | 0.196 |
+
+The plate is everything above y 0.49 — 0.11 of height, flaring to r 1.17.
+Below it the model is a bare shaft of r ~0.19. So the cut is taken 0.11 below
+the model's top: nothing of the plate survives and it passes through the
+narrowest part of the machine. The constant is `MOUNT_PLATE_DEPTH`, applied to
+`domeYatRadius(rXZ)` — the same expression the seating uses for the model's top
+— rather than the literal 0.49, so it follows a rescale or a re-seat.
+
+**The cut is not hidden and does not need to be.** Lifting the rig until it
+cleared the frame was tried: 0.36 of lift does hide it, and costs the
+composition, taking the machine's bottom from 74.5% to 57.3% of the frame. Left
+where it is, the cut lands on the shaft's collar at 11% down the frame and is
+seen from 14 degrees below, so the opening is foreshortened almost to nothing
+and it reads as the machine running up out of shot. No cap geometry, no lift.
+
+Verified on the shipped build at all eight 45-degree steps of the orbit: top of
+the machine at 11.0-11.5%, bottom at 73.3-74.6%, width 0.593-0.603 — the
+reference framing from §7.16 is untouched. Clip plane resolves to y 0.4905
+against the 0.49 that was measured by hand.
+
+`HIDE_MOUNT` is a single flag and both meshes keep their code, because this
+composition has now been reversed twice; setting it to false restores the room.
+The width metric drops from 0.705 to ~0.60 with the mount gone — the canopy was
+the widest thing in frame, so that number is no longer comparable to §7.16's.
