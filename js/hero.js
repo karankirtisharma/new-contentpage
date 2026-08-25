@@ -13,6 +13,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { FilmPass } from 'three/addons/postprocessing/FilmPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 const ASSETS = window.HERO_ASSETS || {};
 const FINAL = ASSETS.finalDir || 'assets-final/';
@@ -34,9 +35,17 @@ const AMBIENT = 0x405a4a;         /* cool green-grey (was 0x404060)    */
 const RIG_TARGET_DIAG = 3.6;    /* world-space diagonal the model is scaled to */
 const RIG_Y_STRETCH   = 1.0;    /* was 1.2 — a box-rig hack, never for a real asset */
 const CEILING_Y       = 0.62;   /* mount plane: the model's bbox top lands exactly here */
-const CEILING_R       = 7.0;    /* dome radius; wide enough to fill the top of frame */
-const CEILING_ARC     = 0.42;   /* radians of the dome cap — how far it curves away */
-const FOG_DENSITY     = 0.115;  /* FogExp2; depth separation without hiding the rig */
+/* The ceiling is a spherical cap. Its radius is deliberately huge: the machine's
+   canopy is a FLAT disc reaching r 1.651, so a tight dome curves out from under
+   it and the disc punches straight through — at R 7 it pierced by 0.197. Drop
+   over a radius r is ~r^2/2R, so R 70 puts that at 0.019, invisible, while the
+   cap still curves visibly away at the frame edges (0.26 at r 6, 0.73 at the
+   rim) which is the whole reason it is not a flat plane. */
+const CEILING_R       = 70.0;   /* dome radius — flat where the rig mounts, curved at the edges */
+const CEILING_ARC     = 0.145;  /* radians of cap; rim lands at r ~10.1 */
+const FOG_DENSITY     = 0.085;  /* FogExp2; depth separation without hiding the rig */
+/* height of the dome surface at a given horizontal radius */
+const domeYatRadius = r => CEILING_Y - CEILING_R + Math.sqrt(Math.max(0, CEILING_R * CEILING_R - r * r));
 /* The orbit target is lifted to the machine's own centre and the camera is set
    a little BELOW it, so the shot looks slightly upward and the ceiling is seen
    from underneath — the only way the mount reads as a mount. Both are derived
@@ -47,6 +56,8 @@ const ORBIT_XZ        = [-2.686, -2.199];  /* keeps the original 3.471 orbit rad
 const SCROLL_SPIN     = 0.0016; /* radians of rig.rotation.y per scrolled design-px */
 
 let ORBIT_Y = 0;                /* machine centre in world Y; set when the rig loads */
+let CANOPY_R = 1.651;           /* canopy rim radius; re-measured when the rig loads */
+let ceilingMat = null;          /* so the loader can hand the real radius to the shader */
 
 /* dev-only placement mode, ?tune=1 — see TUNE MODE at the foot of this file */
 const TUNE = new URLSearchParams(location.search).get('tune') === '1';
@@ -84,63 +95,55 @@ renderer.setSize(container.clientWidth, container.clientHeight);
    so the §2 palette lands exactly where it did before. */
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 0.78;   /* down from 1.0 — lets the model read as material, not a flat cutout */
 container.appendChild(renderer.domElement);
 
-/* ---------------------------------------------------------------- LIGHTS */
-scene.add(new THREE.AmbientLight(AMBIENT, 0.3));
-const spotLight = new THREE.SpotLight(0xffffff, 40);
-spotLight.position.set(0, 3, 0.5);
-spotLight.target.position.set(0, 0, 0);
-spotLight.angle = Math.PI / 5;
-spotLight.penumbra = 0.3;
+/* ---------------------------------------------------------------- LIGHTS
+   Rebuilt for contrast. The old rig was a 40-intensity spot plus a rim AND a
+   fill, which lit every surface to roughly the same value — that flat, blown,
+   single-note look. The rule now is: one motivated key, one rim, almost no
+   ambient, and most of the frame left in shadow.
+
+   Values changed:  ambient  0.30 -> 0.05 and re-hued to teal, so shadows fall
+                             toward blue-green instead of matching the accent
+                    spot     40 -> 26 but MOVED to 1.3 above the ceiling and
+                             narrowed (angle 0.62, penumbra 0.30 -> 0.82), so it
+                             lights the machine like the fixture it hangs from
+                             instead of washing it from the side
+                    fill     0.80 -> 0.10 (all but killed — it was the main
+                             cause of the even, formless lighting)
+                    rim      1.20 -> 1.70, re-hued from accent-green to cool
+                             teal so the silhouette separates from a green
+                             background instead of blending into it            */
+const SHADOW_TEAL = 0x0d3330;     /* shadows bias cool, never accent-green */
+const KEY_TINT    = 0xdaffe9;     /* mint-white, the §2 hot tier            */
+const RIM_TEAL    = 0x35e8c4;     /* cool separator against the green haze   */
+
+scene.add(new THREE.AmbientLight(SHADOW_TEAL, 0.05));
+
+/* motivated key: it lives AT the mount and points down the machine */
+/* Sits ABOVE the ceiling, not at the mount. With decay 2 a spot placed level
+   with the canopy is effectively inside the geometry, and 1/r^2 turns the mount
+   into a white blob. Backing it off 1.3 above the ceiling and raising the
+   intensity to match gives the same pool with a usable falloff. */
+const spotLight = new THREE.SpotLight(KEY_TINT, 26);
+spotLight.position.set(0, CEILING_Y + 1.3, 0);
+spotLight.target.position.set(0, CEILING_Y - 2.4, 0);
+spotLight.angle = 0.62;
+spotLight.penumbra = 0.82;        /* soft-edged pool, not a hard cone */
 spotLight.decay = 2;
-spotLight.distance = 15;
+spotLight.distance = 11;
 scene.add(spotLight, spotLight.target);
 
-const rimLight = new THREE.DirectionalLight(RIM, 1.2);
-rimLight.position.set(-2, 2, -2);
+/* rim, opposite the idle camera, to lift the silhouette off the haze */
+const rimLight = new THREE.DirectionalLight(RIM_TEAL, 1.7);
+rimLight.position.set(2.6, 1.3, 2.2);
 scene.add(rimLight);
 
-const fillLight = new THREE.DirectionalLight(FILL, 0.8);
-fillLight.position.set(2, 1, 2);
+/* what is left of the fill — just enough that the shadow side is not a hole */
+const fillLight = new THREE.DirectionalLight(FILL, 0.10);
+fillLight.position.set(-2.2, 0.4, 1.8);
 scene.add(fillLight);
-
-/* --------------------------------------------------------- ENVIRONMENT
-   The rig's material is metalness 0.88 / roughness 0.07 — a near-mirror. A
-   metal that smooth reflects its surroundings and almost nothing else, so with
-   no environment it renders as a black silhouette no matter how the lights are
-   set. This builds one procedurally out of the §2 tokens (no new asset, no new
-   dependency): a dark-to-accent vertical gradient plus a mint-white key card
-   where the spot sits, so every reflection the machine picks up is already in
-   the palette. Tune ENV_INTENSITY, not the lights, to change how hot it reads. */
-const ENV_INTENSITY = 15.0;
-{
-  const envScene = new THREE.Scene();
-  const shell = new THREE.Mesh(
-    new THREE.SphereGeometry(8, 24, 16),
-    new THREE.ShaderMaterial({
-      side: THREE.BackSide,
-      uniforms: { uLo: { value: new THREE.Color(0x02160b) }, uHi: { value: new THREE.Color(ACCENT) } },
-      vertexShader: `varying float vY;
-        void main(){ vY = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: `uniform vec3 uLo; uniform vec3 uHi; varying float vY;
-        void main(){ gl_FragColor = vec4(mix(uLo, uHi * 0.42, smoothstep(-0.35, 0.95, vY)), 1.0); }`
-    })
-  );
-  envScene.add(shell);
-  /* key card overhead, matching the spot at (0,3,0.5) — gives the metal an edge
-     to catch instead of a flat wash */
-  const key = new THREE.Mesh(new THREE.PlaneGeometry(7, 7), new THREE.MeshBasicMaterial({ color: HOT_CORE }));
-  key.position.set(0, 6.5, 1); key.rotation.x = Math.PI / 2;
-  envScene.add(key);
-
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(envScene, 0.04).texture;
-  pmrem.dispose();
-  shell.geometry.dispose(); shell.material.dispose();
-  key.geometry.dispose(); key.material.dispose();
-}
 
 /* ------------------------------------------------------- ATMOSPHERE
    Fog gives the rig depth — the far arms sink back instead of reading as one
@@ -192,6 +195,65 @@ scene.fog = new THREE.FogExp2(0x04160c, FOG_DENSITY);
   scene.add(backdrop);
 }
 
+/* -------------------------------------------------------- ENVIRONMENT
+   This is the single most important light in the scene and it is not a light.
+   The rig samples at metalness 0.88 / roughness 0.07 — a near-mirror. A metal
+   that smooth reflects its surroundings and almost nothing else, so with no
+   environment it renders as a black silhouette at ANY light intensity; the
+   spot and rim only ever give it a few specular pinpricks.
+
+   The env is generated at runtime with PMREMGenerator from the same palette
+   and the same vertical gradient as the backdrop shell above, so what the
+   metal reflects and what sits behind it agree instead of looking pasted
+   together. Plus a mint key card at the mount, matching the spot, so the
+   reflections have a bright edge to run along rather than a flat wash.
+   No asset, no extra dependency.
+
+   ENV_INTENSITY is the exposure knob for the machine — reach for it before the
+   lights, since it is what the surface is actually made of. It went 15 -> 2.5:
+   the canopy is a wide, nearly flat mirror seen at a grazing angle, so it was
+   sampling the env's bright upper hemisphere across its whole face and blowing
+   out to a flat green disc. At 2.5 it reads as dark metal with a hot rim, which
+   is what gives the top of the frame any form at all. */
+const ENV_INTENSITY = 2.5;
+const EMISSIVE_GAIN = 1.1;     /* how hot the self-lit veins burn */
+const EMISSIVE_GATE = 6.0;     /* higher = only the brightest texture areas glow */
+{
+  const envScene = new THREE.Scene();
+  const shell = new THREE.Mesh(
+    new THREE.SphereGeometry(12, 32, 24),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      uniforms: { uDeep: { value: new THREE.Color(0x03100a) },
+                  uHaze: { value: new THREE.Color(0x2fbf63) },
+                  uCool: { value: new THREE.Color(0x0e3f4a) } },
+      vertexShader: `varying vec3 vP;
+        void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      fragmentShader: `uniform vec3 uDeep; uniform vec3 uHaze; uniform vec3 uCool; varying vec3 vP;
+        void main(){
+          /* same vertical structure as the backdrop, with a cool floor so the
+             underside of the metal picks up teal instead of more green */
+          float up = smoothstep(-0.85, 0.85, vP.y);
+          vec3 c = mix(mix(uCool, uDeep, smoothstep(-1.0, -0.1, vP.y)), uHaze * 0.62, up);
+          gl_FragColor = vec4(c, 1.0);
+        }`
+    })
+  );
+  envScene.add(shell);
+  /* key card at the mount, matching the spot — gives the mirror an edge to catch */
+  const key = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4),
+    new THREE.MeshBasicMaterial({ color: KEY_TINT }));
+  key.position.set(0, CEILING_Y + 0.4, 0);
+  key.rotation.x = Math.PI / 2;
+  envScene.add(key);
+
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(envScene, 0.035).texture;
+  pmrem.dispose();
+  shell.geometry.dispose(); shell.material.dispose();
+  key.geometry.dispose(); key.material.dispose();
+}
+
 /* ------------------------------------------------------------- CEILING
    The rig hangs from this like a ceiling fan: the model's bbox top is placed
    exactly at CEILING_Y, and the plane sits in world space (not under `rig`),
@@ -216,31 +278,68 @@ scene.fog = new THREE.FogExp2(0x04160c, FOG_DENSITY);
       side: THREE.DoubleSide, transparent: true, depthWrite: false, fog: false,
       uniforms: { uCol: { value: new THREE.Color(ACCENT) },
                   uBase: { value: new THREE.Color(0x0e1b13) },
-                  uArc: { value: CEILING_ARC } },
-      vertexShader: `varying float vT; varying vec3 vL;
+                  uCanopyR: { value: CANOPY_R } },
+      vertexShader: `varying float vR; varying vec3 vL;
         void main(){
           vL = position;
-          vT = acos(clamp(normalize(position).y, -1.0, 1.0));   /* polar angle from the pole */
+          vR = length(position.xz);        /* world radius from the mount */
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
         }`,
-      fragmentShader: `uniform vec3 uCol; uniform vec3 uBase; uniform float uArc;
-        varying float vT; varying vec3 vL;
+      fragmentShader: `uniform vec3 uCol; uniform vec3 uBase; uniform float uCanopyR;
+        varying float vR; varying vec3 vL;
         ${NOISE_GLSL}
         void main(){
-          float d = clamp(vT / uArc, 0.0, 1.0);            /* 0 at the mount, 1 at the rim */
-          float pool = 1.0 - smoothstep(0.0, 0.34, d);     /* spill from the fixture */
-          float halo = 1.0 - smoothstep(0.0, 0.07, abs(d - 0.16));  /* rim at the disc edge */
-          float slab = 1.0 - smoothstep(0.34, 0.98, d);
-          float grain = 0.55 + 0.45 * fbm(vec2(atan(vL.z, vL.x) * 3.0, d * 7.0) * 2.6);
-          vec3 col = uBase + uCol * (0.42 * pool + 0.30 * halo) * grain;
-          gl_FragColor = vec4(col, clamp(slab * 0.9 + pool * 0.75 + halo * 0.6, 0.0, 1.0));
+          /* Everything here is in WORLD radius. It used to be normalised against
+             the cap's arc, which meant flattening the dome silently scaled the
+             light pool up with it and blew the whole ceiling out. */
+          float pool = 1.0 - smoothstep(uCanopyR * 0.35, uCanopyR * 2.1, vR);
+          float halo = 1.0 - smoothstep(0.0, uCanopyR * 0.16, abs(vR - uCanopyR));
+          float slab = 1.0 - smoothstep(uCanopyR * 1.6, uCanopyR * 5.5, vR);
+          float grain = 0.6 + 0.4 * fbm(vec2(atan(vL.z, vL.x) * 3.0, vR * 1.1) * 2.6);
+          vec3 col = uBase + uCol * (0.16 * pool + 0.20 * halo) * grain;
+          gl_FragColor = vec4(col, clamp(slab * 0.55 + pool * 0.30 + halo * 0.45, 0.0, 1.0));
         }`
     })
   );
   /* sphere centre dropped by the radius so the cap's pole lands on CEILING_Y */
+  ceilingMat = ceiling.material;
   ceiling.position.y = CEILING_Y - CEILING_R;
   ceiling.renderOrder = -1;
   scene.add(ceiling);
+}
+
+/* --------------------------------------------------------- LIGHT SHAFT
+   A cone of light falling from the mount down the machine. Additive, no depth
+   write, and deliberately faint — the moment it reads as a solid cone it has
+   gone too far. It is what stops the key light from being invisible: without
+   something in the air to catch it, a spot in a dark room only shows where it
+   lands, never that it travelled. */
+const SHAFT_OPACITY = 0.020;
+{
+  const shaft = new THREE.Mesh(
+    new THREE.ConeGeometry(1.75, 2.9, 48, 1, true),
+    new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending, fog: false,
+      uniforms: { uCol: { value: new THREE.Color(KEY_TINT) }, uOp: { value: SHAFT_OPACITY } },
+      vertexShader: `varying vec2 vUv; varying vec3 vN;
+        void main(){ vUv = uv; vN = normalize(normalMatrix * normal);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      fragmentShader: `uniform vec3 uCol; uniform float uOp; varying vec2 vUv; varying vec3 vN;
+        void main(){
+          /* fade in from the mount and out well before the cone's own bottom
+             edge, so there is never a hard rim to read as a fog card */
+          float down = smoothstep(0.0, 0.30, vUv.y) * (1.0 - smoothstep(0.35, 0.92, vUv.y));
+          /* grazing angles read brightest, like a real shaft edge-on; a high
+             exponent keeps the middle of the cone empty */
+          float graze = pow(1.0 - abs(vN.z), 3.6);
+          gl_FragColor = vec4(uCol, uOp * down * graze);
+        }`
+    })
+  );
+  shaft.position.y = CEILING_Y - 1.45;
+  shaft.renderOrder = 3;
+  scene.add(shaft);
 }
 
 /* ----------------------------------------------------------------- RIG
@@ -501,14 +600,40 @@ new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
     const size = box.getSize(new THREE.Vector3());
     const c = box.getCenter(new THREE.Vector3());
     model.position.sub(c);                       /* bbox centre -> rigBody origin, X/Z on axis */
-    rigBody.position.y = CEILING_Y - size.y / 2; /* bbox top -> exactly CEILING_Y */
+    /* Hang it so the canopy's OUTER RIM touches the dome, not so its centre
+       touches the pole — the canopy is flat and the dome is not, so pinning at
+       the pole leaves the rim sticking through the ceiling. */
+    const rXZ = Math.max(Math.hypot(box.max.x, box.max.z), Math.hypot(box.min.x, box.min.z));
+    CANOPY_R = rXZ;
+    if (ceilingMat) ceilingMat.uniforms.uCanopyR.value = CANOPY_R;
+    rigBody.position.y = domeYatRadius(rXZ) - size.y / 2;
     ORBIT_Y = rigBody.position.y;                /* == the model's centre, the new orbit centre */
 
+    /* Self-illuminated veins. The machine should light itself rather than only
+       being lit from outside — that is what reads as "energy machine" instead
+       of "green statue". There is no separate emissive map, so the brightest
+       parts of the basecolor become the emitter: luminance raised to a power so
+       only the top of the range survives, then pushed through the §2 accent.
+       EMISSIVE_GAIN scales it, EMISSIVE_GATE decides how selective it is. */
     const maxAniso = renderer.capabilities.getMaxAnisotropy();
     let glbMesh = null;
     model.traverse(o => {
       if (!o.isMesh || !o.material) return;
       o.material.envMapIntensity = ENV_INTENSITY;
+      o.material.onBeforeCompile = sh => {
+        sh.uniforms.uEmGain = { value: EMISSIVE_GAIN };
+        sh.uniforms.uEmGate = { value: EMISSIVE_GATE };
+        sh.uniforms.uEmCol = { value: new THREE.Color(ACCENT) };
+        sh.fragmentShader = 'uniform float uEmGain; uniform float uEmGate; uniform vec3 uEmCol;\n'
+          + sh.fragmentShader.replace('#include <emissivemap_fragment>',
+            `#include <emissivemap_fragment>
+             {
+               float lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+               float vein = pow(clamp(lum, 0.0, 1.0), uEmGate);
+               totalEmissiveRadiance += uEmCol * vein * uEmGain;
+             }`);
+      };
+      o.material.needsUpdate = true;
       for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap']) {
         if (o.material[k]) { o.material[k].anisotropy = maxAniso; o.material[k].needsUpdate = true; }
       }
@@ -538,10 +663,15 @@ new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
 
     /* assert the mount is flush — computed, not eyeballed */
     rig.updateMatrixWorld(true);
-    const worldTop = new THREE.Box3().setFromObject(model).max.y;
-    const gap = worldTop - CEILING_Y;
-    console.log(`[hero] model bbox.max.y = ${worldTop.toFixed(6)}  CEILING_Y = ${CEILING_Y.toFixed(6)}  gap = ${gap.toFixed(6)}`);
-    if (Math.abs(gap) > 1e-4) console.error('[hero] ceiling gap is not zero:', gap);
+    const wb = new THREE.Box3().setFromObject(model);
+    const wr = Math.max(Math.hypot(wb.max.x, wb.max.z), Math.hypot(wb.min.x, wb.min.z));
+    const seatGap = wb.max.y - domeYatRadius(wr);        /* at the rim: must be 0 */
+    const poleGap = domeYatRadius(0) - wb.max.y;          /* at the centre: small and positive */
+    console.log(`[hero] ceiling seat: top=${wb.max.y.toFixed(6)} rim r=${wr.toFixed(3)} ` +
+                `domeAtRim=${domeYatRadius(wr).toFixed(6)} seatGap=${seatGap.toFixed(6)} ` +
+                `clearanceAtPole=${poleGap.toFixed(6)}`);
+    if (Math.abs(seatGap) > 1e-4) console.error('[hero] canopy is not seated on the dome:', seatGap);
+    if (poleGap < -1e-4) console.error('[hero] canopy pierces the dome at the pole:', poleGap);
   },
   undefined,
   err => {
@@ -667,9 +797,56 @@ const bloomPass = new UnrealBloomPass(
 composer.addPass(bloomPass);
 /* Grain kept at a whisper, scanlines off entirely (they were the crawl). Set
    FILM_STRENGTH to 0 to drop the pass's contribution completely. */
-const FILM_STRENGTH = 0.10;
+const FILM_STRENGTH = 0.06;   /* was 0.10 — grain is not where the mood comes from */
 const filmPass = new FilmPass(FILM_STRENGTH, 0.0, 700, false);
 composer.addPass(filmPass);
+
+/* ------------------------------------------------------------- GRADE
+   The complaint this answers: everything sat at one value and one hue, so the
+   image had no tonal range. Three things, all cheap, all sharp — no blur:
+     - split-tone. Shadows are pulled toward teal and highlights toward mint, so
+       the darks and the lights stop being the same green. This is what gives
+       the frame somewhere to go between black and accent.
+     - a contrast curve about a low pivot, which deepens the shadows toward
+       near-black without crushing the screens.
+     - a vignette, to stop the corners competing with the centre.
+   GRADE_* below are the only knobs; none of them soften an edge. */
+const GRADE_SHADOW   = new THREE.Color(0x6fd8ff);  /* cool bias applied in the darks */
+const GRADE_HIGH     = new THREE.Color(0xd6ffe4);  /* mint, reserved for real highlights */
+const GRADE_CONTRAST = 1.16;
+const GRADE_PIVOT    = 0.28;
+const GRADE_VIGNETTE = 0.55;
+const gradePass = new ShaderPass({
+  uniforms: {
+    tDiffuse: { value: null },
+    uShadow: { value: GRADE_SHADOW }, uHigh: { value: GRADE_HIGH },
+    uContrast: { value: GRADE_CONTRAST }, uPivot: { value: GRADE_PIVOT },
+    uVig: { value: GRADE_VIGNETTE }
+  },
+  vertexShader: `varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec3 uShadow; uniform vec3 uHigh;
+    uniform float uContrast; uniform float uPivot; uniform float uVig; varying vec2 vUv;
+    void main(){
+      vec4 c = texture2D(tDiffuse, vUv);
+      float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+
+      /* split-tone: darks toward teal, lights toward mint */
+      float t = smoothstep(0.02, 0.55, l);
+      vec3 tint = mix(uShadow, uHigh, t);
+      c.rgb *= mix(vec3(1.0), tint, 0.42);
+
+      /* contrast about a low pivot — deepens shadows, leaves highlights alone */
+      c.rgb = clamp((c.rgb - uPivot) * uContrast + uPivot, 0.0, 1.0);
+
+      /* vignette */
+      vec2 d = vUv - 0.5;
+      c.rgb *= clamp(1.0 - uVig * dot(d, d) * 1.9, 0.0, 1.0);
+
+      gl_FragColor = c;
+    }`
+});
+composer.addPass(gradePass);
 
 /* ------------------------------------------------------------- RESIZE */
 new ResizeObserver(() => {
@@ -754,6 +931,7 @@ animate();
    adjustable by transform any more. This just exposes the handles.
    Nothing below runs unless the flag is present. */
 if (TUNE) {
+  window.__THREE = THREE;
   window.__screens = screens;
   window.__rig = rig;
   window.__rigBody = rigBody;
@@ -762,5 +940,8 @@ if (TUNE) {
   window.__renderer = renderer;
   window.__film = filmPass;      /* .enabled = false to preview with no grain */
   window.__bloom = bloomPass;
+  window.__grade = gradePass;
+  window.__spot = spotLight;
+  window.__rim = rimLight;
   console.log('[tune] on — __screens/__rig/__rigBody/__cam/__controls/__renderer/__film/__bloom');
 }
