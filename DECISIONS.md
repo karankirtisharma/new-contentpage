@@ -405,3 +405,43 @@ was tried and is too far: the machine went black, because the old look was
 leaning on bloom at threshold 0.2 to fake surface brightness. The right lever
 for that is `ENV_INTENSITY`, which went 5 -> 15 — that brightens the metal's
 actual reflections, which is crisp, instead of adding glow, which is not.
+
+## 7.7 · The orbit moved up, and the refresh glitch
+
+**The orbit target now sits at the machine's centre, not the world origin.**
+This was the open item flagged in 7.3 and it is the only thing that makes a
+ceiling mount readable with this camera. `ORBIT_Y` is derived at load — it is
+`rigBody.position.y`, which by construction *is* the model's bbox centre — and
+the camera is placed `ORBIT_RISE` (-0.10) below it, so the shot looks slightly
+upward and the ceiling is seen from underneath.
+
+The orbit itself is unchanged, which was the constraint: radius 3.473 (was
+3.471), the same manual spin at the same rate, the same `[1.35, 1.65]` polar
+clamp — the resulting polar is 1.60, comfortably inside it. Only the centre of
+the orbit moved. `ORBIT_XZ` is the original XZ scaled to hold the radius while
+the Y offset changed.
+
+The ceiling plane went from a bounded 2.3 disc to a 6.0 one, because with the
+camera below it there is no longer any risk of it reading as a floor. Its shader
+gained a spill pool and a rim halo at the disc's edge: the join is sold by light
+falling on the ceiling *from* the fixture, far more than by the slab itself.
+
+**The refresh glitch was the render loop starting before the camera was posed.**
+`animate()` began drawing immediately at module evaluation, while the camera was
+still at its construction position and the rig was still loading. So a refresh
+showed a wrong-angle view of a half-loaded machine, which then *snapped* to the
+dolly's start pose when the promise resolved. Three fixes, all in that order:
+
+- a `sceneReady` gate — nothing renders until the rig is loaded, the dolly is
+  armed and the pose is set. The canvas is transparent over a black page until
+  then, so only the preloader shows.
+- `renderer.compile(scene, camera)` immediately before arming, while nothing is
+  on screen. Without it the first frame of the dolly pays for every PBR and
+  video shader compile and visibly hitches exactly as the motion starts.
+- the canvas fades in over 0.4s on `hero:ready` via `body.chrome-in`, instead of
+  popping. This also finally gives `chrome-in` something to do — 7.4 noted it
+  had been left gating nothing.
+
+Verified frame by frame: at 500ms only the preloader is on screen, at 1100ms the
+canvas is fading in with the dolly already at its start, and 1900-5200ms is one
+continuous pull-back with no jump.

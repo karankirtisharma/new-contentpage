@@ -34,8 +34,17 @@ const AMBIENT = 0x405a4a;         /* cool green-grey (was 0x404060)    */
 const RIG_TARGET_DIAG = 2.0;    /* world-space diagonal the model is scaled to */
 const RIG_Y_STRETCH   = 1.0;    /* was 1.2 — a box-rig hack, never for a real asset */
 const CEILING_Y       = 0.62;   /* mount plane: the model's bbox top lands exactly here */
-const CEILING_R       = 2.3;    /* bounded on purpose — see the note on the ceiling mesh */
+const CEILING_R       = 6.0;    /* wide enough to fill the top of frame as a real ceiling */
+/* The orbit target is lifted to the machine's own centre and the camera is set
+   a little BELOW it, so the shot looks slightly upward and the ceiling is seen
+   from underneath — the only way the mount reads as a mount. Both are derived
+   from the model at load (ORBIT_Y), not guessed. The orbit itself is unchanged:
+   same radius, same spin, same polar clamp — only where it is centred moved. */
+const ORBIT_RISE      = -0.10;  /* camera height relative to the orbit target */
+const ORBIT_XZ        = [-2.686, -2.199];  /* keeps the original 3.471 orbit radius */
 const SCROLL_SPIN     = 0.0016; /* radians of rig.rotation.y per scrolled design-px */
+
+let ORBIT_Y = 0;                /* machine centre in world Y; set when the rig loads */
 
 /* dev-only placement mode, ?tune=1 — see TUNE MODE at the foot of this file */
 const TUNE = new URLSearchParams(location.search).get('tune') === '1';
@@ -45,8 +54,10 @@ const scene = new THREE.Scene();
 scene.background = null;
 
 const camera = new THREE.PerspectiveCamera(28.5, container.clientWidth / container.clientHeight, 0.1, 100);
-camera.position.set(-2.2, 1.9, -1.8);
-camera.lookAt(0, 0, 0);
+/* Provisional only — the real pose is set from ORBIT_Y once the rig loads, and
+   nothing renders before then. */
+camera.position.set(-2.686, 0.52, -2.199);
+camera.lookAt(0, 0.62, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance', stencil: false, depth: true });
 renderer.setClearColor(0x000000, 0);
@@ -152,15 +163,19 @@ const ENV_INTENSITY = 15.0;
     new THREE.CircleGeometry(CEILING_R, 64),
     new THREE.ShaderMaterial({
       side: THREE.DoubleSide, transparent: true, depthWrite: false,
-      uniforms: { uCol: { value: new THREE.Color(ACCENT) }, uBase: { value: new THREE.Color(0x070d09) } },
+      uniforms: { uCol: { value: new THREE.Color(ACCENT) }, uBase: { value: new THREE.Color(0x0e1b13) } },
       vertexShader: `varying vec2 vUv;
         void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
       fragmentShader: `uniform vec3 uCol; uniform vec3 uBase; varying vec2 vUv;
         void main(){
           float d = length(vUv - 0.5) * 2.0;              /* 0 at the mount, 1 at the rim */
-          float pool = 1.0 - smoothstep(0.0, 0.14, d);    /* accent spill around the fixture */
-          float slab = 1.0 - smoothstep(0.30, 0.95, d);   /* slab fades before its own edge */
-          gl_FragColor = vec4(uBase + uCol * 0.13 * pool, clamp(slab + pool * 0.6, 0.0, 1.0));
+          /* light spilling off the fixture onto the ceiling it is bolted to —
+             this is what actually sells the join, more than the slab does */
+          float pool = 1.0 - smoothstep(0.0, 0.24, d);
+          float halo = 1.0 - smoothstep(0.0, 0.055, abs(d - 0.115));  /* rim right at the disc edge */
+          float slab = 1.0 - smoothstep(0.26, 0.92, d);   /* slab fades before its own edge */
+          vec3 col = uBase + uCol * (0.30 * pool + 0.22 * halo);
+          gl_FragColor = vec4(col, clamp(slab * 0.85 + pool * 0.7 + halo * 0.5, 0.0, 1.0));
         }`
     })
   );
@@ -427,6 +442,7 @@ new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
     const c = box.getCenter(new THREE.Vector3());
     model.position.sub(c);                       /* bbox centre -> rigBody origin, X/Z on axis */
     rigBody.position.y = CEILING_Y - size.y / 2; /* bbox top -> exactly CEILING_Y */
+    ORBIT_Y = rigBody.position.y;                /* == the model's centre, the new orbit centre */
 
     const maxAniso = renderer.capabilities.getMaxAnisotropy();
     let glbMesh = null;
@@ -501,6 +517,11 @@ const minLoaderP = new Promise(res => setTimeout(res, 650));      /* fast, not a
 Promise.all([Promise.race([Promise.all([modelP, heroVideoP]), timeoutP]), minLoaderP]).then(() => {
   try {
     rig.updateMatrixWorld(true);
+    /* re-centre the orbit on the machine now that its height is known */
+    introToLook.set(0, ORBIT_Y, 0);
+    introToPos.set(ORBIT_XZ[0], ORBIT_Y + ORBIT_RISE, ORBIT_XZ[1]);
+    controls.target.copy(introToLook);
+
     const normal = outwardNormal(s3);
     const dist = (0.65 / 2) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.1;
     introFromLook.copy(s3.mesh.localToWorld(s3.centre.clone()));
@@ -513,9 +534,23 @@ Promise.all([Promise.race([Promise.all([modelP, heroVideoP]), timeoutP]), minLoa
   } catch (e) {
     introRunning = false;
     controls.enabled = true;
+    camera.position.set(ORBIT_XZ[0], ORBIT_Y + ORBIT_RISE, ORBIT_XZ[1]);
+    camera.lookAt(0, ORBIT_Y, 0);
+    controls.target.set(0, ORBIT_Y, 0);
   }
+
+  /* Compile every material now, while nothing is on screen yet. Without this
+     the first frame of the dolly pays for the PBR + video shader compiles and
+     visibly hitches right as the motion starts. */
+  renderer.compile(scene, camera);
+
   const pre = document.getElementById('preloader');
   if (pre) pre.style.display = 'none';
+  /* Only now does the scene start drawing — see the sceneReady gate in
+     animate(). Before this the camera was still at its construction pose, so
+     rendering meant showing a wrong-angle view of a half-loaded rig and then
+     snapping to the dolly's start. That snap was the refresh glitch. */
+  sceneReady = true;
   requestAnimationFrame(() => window.dispatchEvent(new Event('hero:ready')));
 });
 
@@ -589,6 +624,10 @@ addEventListener('resize', () => {
 });
 
 /* -------------------------------------------------------- RENDER LOOP */
+/* Nothing is drawn until the rig is loaded, the dolly is armed and the shaders
+   are compiled. The canvas is transparent over a black page until then, so the
+   preloader is all that shows and the hero opens on the dolly's first frame. */
+let sceneReady = false;
 let visible = true;
 new IntersectionObserver(e => {
   visible = e[0].isIntersecting;
@@ -600,7 +639,7 @@ const easeInOutCubic = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3
 
 function animate() {
   requestAnimationFrame(animate);
-  if (!visible || document.hidden) return;
+  if (!sceneReady || !visible || document.hidden) return;
   const nowMs = performance.now();
   const dt = Math.min((nowMs - introPrev) / 1000, 0.05); introPrev = nowMs;
 

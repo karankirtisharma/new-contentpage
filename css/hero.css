@@ -31,8 +31,12 @@ body{
 
 /* ---- the 3D stage ---- */
 #scene3d{position:absolute;left:0;top:-5px;width:1024px;height:629px;z-index:4}
+/* Fades in on hero:ready (chrome.js adds .chrome-in), so the first dolly frame
+   arrives instead of popping. */
 #scene3d canvas{display:block;width:100%!important;height:100%!important;
+  opacity:0;transition:opacity .4s ease;
   cursor:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='128' height='34'><path d='M15 2v26M2 15h26' stroke='white' stroke-width='2.2'/><text x='34' y='9' fill='%23999999' font-family='monospace' font-size='9' letter-spacing='0.5'>ROTATE 3D</text></svg>") 15 15, crosshair}
+body.chrome-in #scene3d canvas{opacity:1}
 #preloader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   transform:translateY(-100px);z-index:3;pointer-events:none}
 #preloader .ring{width:80px;height:80px;border:1px solid var(--accent-deep);border-top-color:var(--accent);
@@ -41,4 +45,5 @@ body{
 
 @media (prefers-reduced-motion:reduce){
   #preloader .ring{animation:none}
+  #scene3d canvas{transition:none}
 }
