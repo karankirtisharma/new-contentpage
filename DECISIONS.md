@@ -637,3 +637,93 @@ drops the green grade for raw footage colour.
 a frame without the rAF loop. No geometry, position, camera or scroll behaviour
 was touched.
 
+## 7.12 · The ceiling was a saucer, and vertical orbit is off
+
+### What the ceiling actually is
+
+Asked before changing anything. The scene holds exactly four drawn things:
+the backdrop shell (`renderOrder -2`), **one** ceiling cap (`-1`), the light
+shaft (`3`), and the GLB (149,812 tris) with the four screen meshes parented
+into it.
+
+**It is not double geometry.** The GLB does bring its own disc — that is the
+machine's *canopy*, its mounting plate, world radius `CANOPY_R` 1.651, fused
+into the single-node mesh and not separable without cutting the model. The
+ceiling is a separate spherical cap of radius 70. They are seated flush (rim
+gap -2e-6, measured at load) but cannot z-fight: the ceiling has
+`depthWrite: false` and `renderOrder -1`, so it paints before the canopy exists
+in the depth buffer and the canopy draws cleanly over it. Nothing to delete.
+
+### The bright rim was not a specular — the shader was drawing it
+
+There is no specular term on this surface and never was: it is a hand-shaded
+`ShaderMaterial` with no roughness, no env and no reflection. The highlight was
+the `halo` term, a deliberate bright ring at exactly `uCanopyR` — i.e. traced
+along the canopy's rim.
+
+Isolated by gating each term behind a uniform and sampling the rendered centre
+column with the model and backdrop hidden (luminance, 8px steps):
+
+| | profile through the edge |
+|---|---|
+| all terms | `9, 8, 11, 22, **29**, 26, 11, 5, 4, 3 …` |
+| halo off | `9, 8, 8, 7, 7, 7, 6, 5 …` |
+
+A jump from 11 to 29 and back to 0 inside 40px. That step *is* the "hard edge" —
+the surface did not really stop there, it flared and then had nothing left to
+show. `halo` is deleted outright.
+
+### Making it read as infinite
+
+Two changes, because the fade alone was never going to be enough:
+
+- **`uBase` is now multiplied by `slab` rather than added as a floor.** Tone and
+  coverage now reach zero at the same radius. Before, the colour held a constant
+  grey while only alpha faded, which leaves a flat plateau that ends.
+- **`CEILING_ARC` 0.145 → 0.30**, moving the geometric rim from r 10.1 to r 20.7
+  (y -2.5), far outside the frame. Insurance only — the shader has faded the
+  surface to nothing by r ~8 — and it costs no triangles, since `SphereGeometry`
+  segment counts are independent of the arc.
+
+`pool` widened to `uCanopyR * 0.35 … 2.6` and `slab` to `0.9 … 5.0`, so the
+surface is darkest at the frame edges and lifted only around the mount. The pool
+is the one thing that reads.
+
+Verified by sampling columns at x 0.02 / 0.25 / 0.50 / 0.75 / 0.98 with the model
+hidden: **the largest step between adjacent 8px samples is 1 level**, against 18
+at the old halo. Peak 12 at the pool, 3–7 at the frame edges. There is no
+boundary to find. The scene is rotationally symmetric about Y and the polar angle
+is now fixed, so this holds at every point in the 360° orbit by construction.
+
+One consequence worth naming: with the ceiling taken down to a whisper, the
+widest bright thing at the top of frame is the GLB's own canopy. The disc
+silhouette up there is the machine's mounting plate, not the room.
+
+### Vertical orbit disabled
+
+`controls.minPolarAngle === controls.maxPolarAngle === ORBIT_POLAR`, so
+OrbitControls clamps phi back on every update and a vertical drag is a no-op.
+
+`ORBIT_POLAR` is derived — `atan2(hypot(ORBIT_XZ), ORBIT_RISE)` = 1.5996 — not
+typed in, so retuning the orbit constants moves the lock with them. It is also
+exactly the angle the intro dolly lands on, so the clamp does nothing on
+hand-off and the camera cannot snap when controls take over (measured delta from
+the lock at hand-off: 0).
+
+Horizontal drag, the idle auto-spin and the intro dolly are untouched — all
+three rotate about Y, which does not change phi. Touch is unchanged too:
+`touchAction: 'pan-y'` still gives vertical swipes to the page and horizontal
+drags to the rig.
+
+Verified by dispatching real pointer drags at the canvas and settling the
+damping:
+
+| drag | phi | theta |
+|---|---|---|
+| start | 1.5996 | 2.4781 |
+| 260px down | 1.5996 | 2.4781 |
+| 260px up | 1.5996 | 2.4781 |
+| 300px across | 1.5996 | 0.8838 |
+
+Vertical moves nothing. Horizontal moves theta by -1.594 rad with phi delta
+exactly 0.

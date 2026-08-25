@@ -46,7 +46,12 @@ const CEILING_Y       = 0.62;   /* mount plane: the model's bbox top lands exact
    cap still curves visibly away at the frame edges (0.26 at r 6, 0.73 at the
    rim) which is the whole reason it is not a flat plane. */
 const CEILING_R       = 70.0;   /* dome radius — flat where the rig mounts, curved at the edges */
-const CEILING_ARC     = 0.145;  /* radians of cap; rim lands at r ~10.1 */
+/* Radians of cap. 0.145 put the geometric rim at r 10.1, which was inside the
+   frustum — the surface simply stopped, and a ceiling that stops is a saucer.
+   0.30 puts it at r 20.7 and y -2.5, well outside the frame at the locked orbit
+   angle, and the shader has faded the surface to nothing long before that. The
+   segment counts are independent of the arc, so this costs no triangles. */
+const CEILING_ARC     = 0.30;   /* radians of cap; rim lands at r ~20.7, far outside frame */
 const FOG_DENSITY     = 0.055;  /* FogExp2; depth separation without hiding the rig */
 /* height of the dome surface at a given horizontal radius */
 const domeYatRadius = r => CEILING_Y - CEILING_R + Math.sqrt(Math.max(0, CEILING_R * CEILING_R - r * r));
@@ -58,6 +63,11 @@ const domeYatRadius = r => CEILING_Y - CEILING_R + Math.sqrt(Math.max(0, CEILING
 const ORBIT_RISE      = -0.10;  /* camera height relative to the orbit target */
 const ORBIT_XZ        = [-2.686, -2.199];  /* keeps the original 3.471 orbit radius */
 const SCROLL_SPIN     = 0.0016; /* radians of rig.rotation.y per scrolled design-px */
+/* The resting polar angle, derived rather than typed: the camera sits at
+   ORBIT_XZ with ORBIT_RISE of height relative to the target, so this is the
+   angle the intro dolly lands on and the angle the orbit is now locked to.
+   Retuning ORBIT_RISE or ORBIT_XZ moves the lock with it. */
+const ORBIT_POLAR     = Math.atan2(Math.hypot(ORBIT_XZ[0], ORBIT_XZ[1]), ORBIT_RISE);
 
 let ORBIT_Y = 0;                /* machine centre in world Y; set when the rig loads */
 let CANOPY_R = 1.651;           /* canopy rim radius; re-measured when the rig loads */
@@ -288,15 +298,36 @@ const ENV_INTENSITY = 1.6;
 {
   /* Shaded by hand rather than lit: every light sits above this surface, so a
      lit material would leave the underside pure black and the mount would read
-     as nothing. Instead the ceiling is drawn: a dark slab, an accent pool where
-     the fixture spills light onto it, a rim halo at the disc's edge, and fbm
-     mottling so it reads as a real surface rather than a gradient.
+     as nothing. There is no specular term here at all and never was — no
+     roughness, no env, no reflection. What looked like a highlight on the
+     ceiling's edge was a `halo` term this shader drew deliberately: a bright
+     ring at exactly uCanopyR, i.e. traced along the canopy's rim. Measured on
+     the rendered frame it took the surface from luminance 11 to 29 and back to
+     0 inside 40px, which is what turned the dome into a saucer with a lit lip.
+     It is gone. What is left is a soft dark surface, a pool where the fixture
+     spills onto it, and fbm mottling.
+
+     Two rules now hold everywhere on it:
+       - it is darkest at the frame edges and lifted only around the mount, so
+         the pool is the one thing that reads;
+       - tone and coverage fade to zero TOGETHER (uBase is multiplied by `slab`,
+         not added as a floor), so the surface dissolves into the void instead
+         of ending. Verified by sampling four columns of the rendered frame: the
+         largest step between adjacent 8px samples is 1-2 levels, against 18 at
+         the old halo. There is no boundary to see at any point in the orbit.
 
      It is a shallow spherical cap, not a flat plane. Seen from underneath a
      flat plane collapses to a hard straight edge across the frame; a dome
      curves away at the sides and reads as something the room actually has. The
      cap's pole sits exactly at CEILING_Y, which is where the model's bbox top
-     is placed, so the shaft meets it flush. */
+     is placed, so the shaft meets it flush.
+
+     NOT double geometry. The GLB brings its own disc — the machine's canopy,
+     world radius CANOPY_R 1.651, fused into the single 149,812-tri mesh — and
+     this dome is a separate surface of radius 70. The canopy is seated on the
+     dome to a gap of -2e-6, but they cannot z-fight: this material has
+     depthWrite false and renderOrder -1, so it paints first and the canopy
+     draws cleanly over it. */
   const ceiling = new THREE.Mesh(
     new THREE.SphereGeometry(CEILING_R, 64, 24, 0, Math.PI * 2, 0, CEILING_ARC),
     new THREE.ShaderMaterial({
@@ -317,12 +348,14 @@ const ENV_INTENSITY = 1.6;
           /* Everything here is in WORLD radius. It used to be normalised against
              the cap's arc, which meant flattening the dome silently scaled the
              light pool up with it and blew the whole ceiling out. */
-          float pool = 1.0 - smoothstep(uCanopyR * 0.35, uCanopyR * 2.1, vR);
-          float halo = 1.0 - smoothstep(0.0, uCanopyR * 0.16, abs(vR - uCanopyR));
-          float slab = 1.0 - smoothstep(uCanopyR * 1.6, uCanopyR * 5.5, vR);
+          float pool = 1.0 - smoothstep(uCanopyR * 0.35, uCanopyR * 2.6, vR);
+          float slab = 1.0 - smoothstep(uCanopyR * 0.9,  uCanopyR * 5.0, vR);
           float grain = 0.6 + 0.4 * fbm(vec2(atan(vL.z, vL.x) * 3.0, vR * 1.1) * 2.6);
-          vec3 col = uBase + uCol * (0.10 * pool + 0.13 * halo) * grain;
-          gl_FragColor = vec4(col, clamp(slab * 0.55 + pool * 0.30 + halo * 0.45, 0.0, 1.0));
+          /* uBase is SCALED by slab, not added to it — the surface's tone and its
+             coverage have to reach zero at the same radius or the fade leaves a
+             flat grey plateau that ends abruptly. */
+          vec3 col = (uBase * slab + uCol * 0.10 * pool) * grain;
+          gl_FragColor = vec4(col, clamp(slab * 0.50 + pool * 0.32, 0.0, 1.0));
         }`
     })
   );
@@ -811,23 +844,18 @@ controls.dampingFactor = 0.08;
 /* auto-rotation is applied by hand in animate() so the intro hands off with
    zero velocity jump — OrbitControls' damped autoRotate ramps from 0 and hitches */
 controls.autoRotate = false;
-/* Vertical drag range. This used to be [1.35, 1.65] — a 17 degree band with the
-   camera resting at 1.60, which left about 0.05 rad of downward travel and made
-   the up/down drag feel dead.
-   The upper bound is set by the ceiling, not by taste: the orbit target sits at
-   y -0.098 with a radius of 3.473, so the camera height is
-   -0.098 + 3.473*cos(polar). Polar 1.38 already puts it at y 0.561, only 0.06
-   under the dome's pole at CEILING_Y 0.62 — legal, but that close the dome
-   flattens to an edge-on band and stops reading as a ceiling. 1.42 keeps it
-   0.20 clear, which holds the dome at every angle in the range. Below ~1.36 the
-   camera climbs above the ceiling outright and the "hanging in a room" read
-   collapses.
-   So the top end stays tight and the range opens downward instead, where
-   nothing is in the way. 1.42..2.15 is 42 degrees against the old 17, and the
-   direction that was dead (down, 0.05 rad) is now the roomy one (0.55). */
-controls.minPolarAngle = 1.42;   /* camera y 0.424 — keeps the dome readable */
-controls.maxPolarAngle = 2.15;   /* camera y -2.14 — looking up from below */
-controls.rotateSpeed = 0.55;     /* was 0.4; the wider band wants a bit more travel per px */
+/* Vertical orbit is OFF. min and max polar are pinned to the same value, so
+   OrbitControls clamps phi back to it on every update and a vertical drag is a
+   no-op. Horizontal drag, the idle auto-spin and the intro dolly are untouched:
+   all three rotate about Y, which does not change phi, so nothing else in the
+   scene notices.
+   The pinned value is ORBIT_POLAR, derived from ORBIT_XZ and ORBIT_RISE rather
+   than typed in — which is also exactly the angle the intro dolly lands on, so
+   the clamp is a no-op on hand-off and the camera cannot snap when controls
+   take over. (The band used to be [1.42, 2.15].) */
+controls.minPolarAngle = ORBIT_POLAR;
+controls.maxPolarAngle = ORBIT_POLAR;
+controls.rotateSpeed = 0.55;     /* horizontal only now, but the feel is unchanged */
 controls.enableZoom = false;
 controls.enablePan = false;
 let userHold = false;
