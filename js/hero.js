@@ -91,50 +91,15 @@ const SCROLL_SPIN     = 0.0016; /* radians of rig.rotation.y per scrolled design
    width; at FOV 34 it spans 14.8% to 85.3%. FOV 33 gives 72.5% width and 35
    gives 68.0%, so 34 is the fit, not a round number.
 
-   At 34 the canopy and the ceiling are back inside the frame. No camera setting
-   fixes that — the mount sits directly above the machine, so any frame wide
-   enough to show the machine with margin also shows the mount. So the mount is
-   removed from the scene instead; see HIDE_MOUNT below.
+   Consequence, stated plainly: at 34 the canopy and the ceiling are back in
+   shot. Hiding them and matching this reference are not compatible — the mount
+   sits directly above the machine, so any frame wide enough to show the machine
+   with margin also shows the mount. The reference frame itself shows it.
 
    #scene3d's fixed box also means the aspect is 1.628 on every device, so a
    vertical-FOV change is safe here in a way it would not be in a fluid layout. */
 const FRAME_DROP      = 0.18;   /* orbit centre below the machine's own centre */
 const CAMERA_FOV      = 34;     /* 28.5 -> 20 to hide the mount, -> 34 to match the reference */
-
-/* ------------------------------------------------------------- HIDE_MOUNT
-   The mount is cut out of the scene rather than framed out of it, because
-   framing it out cannot be done at this focal length without also throwing away
-   the composition (see FRAMING).
-
-   Three things go: the ceiling dome, the light shaft that fell from it, and the
-   canopy — the wide plate at the top of the machine that read as a saucer. The
-   first two are their own meshes and simply stop being drawn. The canopy is not:
-   it is fused into the single 149,812-triangle mesh, so it is removed with a
-   clipping plane on that material.
-
-   Where to cut is measured, not guessed. Max horizontal radius per world-Y band
-   over the model's vertices:
-
-     y 0.60 -> r 0.11     y 0.52 -> r 0.896
-     y 0.58 -> r 1.168    y 0.50 -> r 0.787
-     y 0.56 -> r 1.167    y 0.48 -> r 0.184   <- shaft only from here down
-     y 0.54 -> r 0.994    y 0.46 -> r 0.196
-
-   The plate is everything above y 0.49, spanning 0.11 of height and flaring to
-   r 1.17; below it the model is a bare shaft of r ~0.19. So the cut is taken at
-   0.11 below the model's top, which leaves nothing of the plate and passes
-   through the narrowest part of the machine.
-
-   The cut itself is not hidden and does not need to be. It lands on the shaft's
-   collar at 11% down the frame, seen from 14 degrees below, so it reads as the
-   machine running up out of shot rather than as a sliced tube — no cap geometry,
-   no lift, and the reference framing is untouched: machine bottom still at
-   73.3-74.6% and width 0.593-0.603 at every one of the eight 45-degree steps of
-   the orbit.
-
-   Set HIDE_MOUNT to false to get the room back. */
-const HIDE_MOUNT        = true;
-const MOUNT_PLATE_DEPTH = 0.11;  /* plate thickness below the model's top, measured above */
 
 /* Unaffected by FRAME_DROP: both are built from ORBIT_XZ and ORBIT_RISE, which
    are offsets RELATIVE to the orbit centre, so moving that centre moves the
@@ -180,7 +145,6 @@ renderer.setSize(container.clientWidth, container.clientHeight);
    finally has to be right: sRGB out, ACES filmic in. Tone mapping applies to
    lit materials only — the accent lines and the screen planes opt out below,
    so the §2 palette lands exactly where it did before. */
-renderer.localClippingEnabled = HIDE_MOUNT;   /* the canopy is cut away per-material, not globally */
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;    /* 0.95 -> 1.0 with the white studio; the model's albedo is dark green and needs it */
@@ -437,7 +401,6 @@ const ENV_INTENSITY = 1.6;
   ceilingMat = ceiling.material;
   ceiling.position.y = CEILING_Y - CEILING_R;
   ceiling.renderOrder = -1;
-  ceiling.visible = !HIDE_MOUNT;
   scene.add(ceiling);
 }
 
@@ -472,7 +435,6 @@ const SHAFT_OPACITY = 0.007;   /* cut hard: against a neutral background the con
   );
   shaft.position.y = CEILING_Y - 1.45;
   shaft.renderOrder = 3;
-  shaft.visible = !HIDE_MOUNT;     /* it fell from the fixture; with the fixture gone it is nothing */
   scene.add(shaft);
 }
 
@@ -782,12 +744,6 @@ new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
        the pole leaves the rim sticking through the ceiling. */
     const rXZ = Math.max(Math.hypot(box.max.x, box.max.z), Math.hypot(box.min.x, box.min.z));
     CANOPY_R = rXZ;
-    /* World Y of the model's top, derived the same way the seating is: the box
-       is centred on rigBody's origin, so the top lands exactly on the dome
-       height at the canopy radius. Deriving it rather than typing 0.49 keeps
-       the cut on the plate if the rig is ever rescaled or re-seated. */
-    const mountClip = new THREE.Plane(new THREE.Vector3(0, -1, 0),
-                                      domeYatRadius(rXZ) - MOUNT_PLATE_DEPTH);
     if (ceilingMat) ceilingMat.uniforms.uCanopyR.value = CANOPY_R;
     rigBody.position.y = domeYatRadius(rXZ) - size.y / 2;
     ORBIT_Y = rigBody.position.y;                /* == the model's centre, the new orbit centre */
@@ -820,7 +776,6 @@ new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
     model.traverse(o => {
       if (!o.isMesh || !o.material) return;
       o.material.envMapIntensity = ENV_INTENSITY;
-      if (HIDE_MOUNT) o.material.clippingPlanes = [mountClip];   /* cuts the canopy off */
       /* The remap. Both chunks define their factor as `scalar * map channel`,
          so appending after the include rewrites the sampled value itself and
          the texture's variation survives the transform. */

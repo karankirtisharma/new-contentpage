@@ -985,3 +985,25 @@ against the 0.49 that was measured by hand.
 composition has now been reversed twice; setting it to false restores the room.
 The width metric drops from 0.705 to ~0.60 with the mount gone — the canopy was
 the widest thing in frame, so that number is no longer comparable to §7.16's.
+
+## 7.18 · §7.17 reverted — the mount is back
+
+`js/hero.js` restored to its state at c6638f2, byte for byte. `HIDE_MOUNT`, the
+`MOUNT_PLATE_DEPTH` constant, `renderer.localClippingEnabled` and the clipping
+plane on the model material are all gone; the ceiling dome and the light shaft
+draw again.
+
+§7.17 is kept above rather than deleted, because the measurement in it is the
+useful part and is independent of whether the cut ships: the canopy plate is
+everything above y 0.49, 0.11 of height flaring to r 1.17, over a shaft of
+r ~0.19 — so the plate can be removed with a single clipping plane 0.11 below
+the model's top, and the resulting cut sits at 11% down the frame. If the mount
+ever needs to come off again, that is the recipe and it does not need
+re-deriving.
+
+Verified on the reverted build: clipping disabled, zero clipping planes on the
+model material, ceiling and shaft visible, FOV 34, orbit centre -0.2971, polar
+still pinned at 1.5996, machine width 0.699-0.705 against the reference's 0.705
+and bottom at 73.3-74.6%. Everything from §7.11 to §7.16 is untouched — the
+white studio lighting, the material remap, the screen gain of 0.70, the top crop
+of 0.14, the height lock and the FOV fit all still stand.
