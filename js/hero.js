@@ -19,12 +19,16 @@ const ASSETS = window.HERO_ASSETS || {};
 const FINAL = ASSETS.finalDir || 'assets-final/';
 const PLACE = ASSETS.placeholderDir || 'placeholders/';
 
-/* §2 green token system, mirrored into the WebGL side */
-const ACCENT = 0x19e65a;          /* signal accent, floor lines + ring */
-const HOT_CORE = 0xb8ffcc;        /* mint-white hot tier, ring core    */
-const RIM = 0x4dff7a;             /* rim light   (was 0xff4d4d)        */
-const FILL = 0x1aff5e;            /* fill light  (was 0xff1a1a)        */
-const AMBIENT = 0x405a4a;         /* cool green-grey (was 0x404060)    */
+/* PALETTE — neutral.
+   The scene used to tint everything green: lights, fog, backdrop, ceiling, the
+   env map and the screen grade all carried the §2 accent. The result was a
+   colour filter over the viewport rather than a lit object — one hue at one
+   value, and highlights that came back saturated green so the glass never read
+   as glass. Green now comes from exactly one place: the model's own basecolor.
+   Everything that lights it or sits behind it is neutral, so a specular
+   highlight returns white and the material can show its own colour. */
+const NEUTRAL_HI  = 0x1a1c1e;     /* background gradient, light end */
+const NEUTRAL_LO  = 0x0a0b0c;     /* background gradient, dark end  */
 
 /* --------------------------------------------------- RIG NORMALISATION
    Tunables for fitting assets-final/hero-rig.glb into the scene. The model is
@@ -43,7 +47,7 @@ const CEILING_Y       = 0.62;   /* mount plane: the model's bbox top lands exact
    rim) which is the whole reason it is not a flat plane. */
 const CEILING_R       = 70.0;   /* dome radius — flat where the rig mounts, curved at the edges */
 const CEILING_ARC     = 0.145;  /* radians of cap; rim lands at r ~10.1 */
-const FOG_DENSITY     = 0.085;  /* FogExp2; depth separation without hiding the rig */
+const FOG_DENSITY     = 0.055;  /* FogExp2; depth separation without hiding the rig */
 /* height of the dome surface at a given horizontal radius */
 const domeYatRadius = r => CEILING_Y - CEILING_R + Math.sqrt(Math.max(0, CEILING_R * CEILING_R - r * r));
 /* The orbit target is lifted to the machine's own centre and the camera is set
@@ -95,7 +99,7 @@ renderer.setSize(container.clientWidth, container.clientHeight);
    so the §2 palette lands exactly where it did before. */
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.78;   /* down from 1.0 — lets the model read as material, not a flat cutout */
+renderer.toneMappingExposure = 0.95;   /* raised back from 0.78: neutral lights deliver far less than green ones did */
 container.appendChild(renderer.domElement);
 
 /* ---------------------------------------------------------------- LIGHTS
@@ -112,14 +116,18 @@ container.appendChild(renderer.domElement);
                              instead of washing it from the side
                     fill     0.80 -> 0.10 (all but killed — it was the main
                              cause of the even, formless lighting)
-                    rim      1.20 -> 1.70, re-hued from accent-green to cool
-                             teal so the silhouette separates from a green
-                             background instead of blending into it            */
-const SHADOW_TEAL = 0x0d3330;     /* shadows bias cool, never accent-green */
-const KEY_TINT    = 0xdaffe9;     /* mint-white, the §2 hot tier            */
-const RIM_TEAL    = 0x35e8c4;     /* cool separator against the green haze   */
+                    rim      1.20 -> 1.25, and now WHITE — a green rim on a
+                             green model just deepened the single-hue problem  */
+/* White lights, not green ones. A green key on a green material multiplies to
+   a flat saturated green with no specular life; a white key lets the basecolor
+   supply the hue and the highlight come back near-white, which is the whole
+   difference between "tinted" and "wet glass". */
+const SHADOW_TONE = 0x2a2e33;     /* neutral, very slightly cool */
+const KEY_TINT    = 0xfff6ec;     /* white, a hair warm          */
+const RIM_TONE    = 0xdfe9ff;     /* white, a hair cool          */
+const FILL_TONE   = 0xffffff;
 
-scene.add(new THREE.AmbientLight(SHADOW_TEAL, 0.05));
+scene.add(new THREE.AmbientLight(SHADOW_TONE, 0.42));
 
 /* motivated key: it lives AT the mount and points down the machine */
 /* Sits ABOVE the ceiling, not at the mount. With decay 2 a spot placed level
@@ -136,12 +144,12 @@ spotLight.distance = 11;
 scene.add(spotLight, spotLight.target);
 
 /* rim, opposite the idle camera, to lift the silhouette off the haze */
-const rimLight = new THREE.DirectionalLight(RIM_TEAL, 1.7);
+const rimLight = new THREE.DirectionalLight(RIM_TONE, 1.25);
 rimLight.position.set(2.6, 1.3, 2.2);
 scene.add(rimLight);
 
 /* what is left of the fill — just enough that the shadow side is not a hole */
-const fillLight = new THREE.DirectionalLight(FILL, 0.10);
+const fillLight = new THREE.DirectionalLight(FILL_TONE, 0.32);
 fillLight.position.set(-2.2, 0.4, 1.8);
 scene.add(fillLight);
 
@@ -168,14 +176,14 @@ const NOISE_GLSL = `
     return v;
   }`;
 
-scene.fog = new THREE.FogExp2(0x04160c, FOG_DENSITY);
+scene.fog = new THREE.FogExp2(0x0e1013, FOG_DENSITY);   /* neutral grey, no hue */
 {
   const backdrop = new THREE.Mesh(
     new THREE.SphereGeometry(22, 32, 24),
     new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false,
-      uniforms: { uDeep: { value: new THREE.Color(0x03100a) },
-                  uHaze: { value: new THREE.Color(0x2fbf63) } },
+      uniforms: { uDeep: { value: new THREE.Color(NEUTRAL_LO) },
+                  uHaze: { value: new THREE.Color(NEUTRAL_HI) } },
       vertexShader: `varying vec3 vP;
         void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
       fragmentShader: `uniform vec3 uDeep; uniform vec3 uHaze; varying vec3 vP;
@@ -186,8 +194,10 @@ scene.fog = new THREE.FogExp2(0x04160c, FOG_DENSITY);
           /* a soft bloom of light behind the machine, so it sits IN the haze
              rather than in front of a flat wall of it */
           float core = pow(1.0 - clamp(abs(vP.y) * 1.35, 0.0, 1.0), 2.0);
-          float a = band * (0.30 + 0.70 * drift) + core * 0.34 * (0.5 + 0.5 * drift);
-          gl_FragColor = vec4(mix(uDeep, uHaze, clamp(a, 0.0, 1.0) * 0.55), 1.0);
+          /* biased so the upper-centre actually reaches uHaze — the gradient has
+             to be visible as a gradient, not collapse to the dark end */
+          float a = band * (0.55 + 0.45 * drift) + core * 0.55 * (0.5 + 0.5 * drift);
+          gl_FragColor = vec4(mix(uDeep, uHaze, clamp(a, 0.0, 1.0)), 1.0);
         }`
     })
   );
@@ -215,24 +225,28 @@ scene.fog = new THREE.FogExp2(0x04160c, FOG_DENSITY);
    sampling the env's bright upper hemisphere across its whole face and blowing
    out to a flat green disc. At 2.5 it reads as dark metal with a hot rim, which
    is what gives the top of the frame any form at all. */
-const ENV_INTENSITY = 2.5;
-const EMISSIVE_GAIN = 1.1;     /* how hot the self-lit veins burn */
-const EMISSIVE_GATE = 6.0;     /* higher = only the brightest texture areas glow */
+const ENV_INTENSITY = 3.4;
 {
   const envScene = new THREE.Scene();
   const shell = new THREE.Mesh(
     new THREE.SphereGeometry(12, 32, 24),
     new THREE.ShaderMaterial({
       side: THREE.BackSide,
-      uniforms: { uDeep: { value: new THREE.Color(0x03100a) },
-                  uHaze: { value: new THREE.Color(0x2fbf63) },
-                  uCool: { value: new THREE.Color(0x0e3f4a) } },
+      /* Deliberately far brighter than the visible backdrop. This shell is never
+         drawn — it only feeds PMREM. A near-mirror reflects the environment and
+         almost nothing else, so if the env matches the dim background the metal
+         has nothing to return and goes black. A studio softbox is much brighter
+         than the wall behind the subject; same idea. */
+      uniforms: { uDeep: { value: new THREE.Color(0x24282c) },
+                  uHaze: { value: new THREE.Color(0xc2ccd4) },
+                  uCool: { value: new THREE.Color(0x4a5158) } },
       vertexShader: `varying vec3 vP;
         void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
       fragmentShader: `uniform vec3 uDeep; uniform vec3 uHaze; uniform vec3 uCool; varying vec3 vP;
         void main(){
-          /* same vertical structure as the backdrop, with a cool floor so the
-             underside of the metal picks up teal instead of more green */
+          /* same vertical structure as the backdrop. Neutral throughout: this
+             is what the metal reflects, so any hue here would come straight
+             back as a tinted highlight and kill the glass read. */
           float up = smoothstep(-0.85, 0.85, vP.y);
           vec3 c = mix(mix(uCool, uDeep, smoothstep(-1.0, -0.1, vP.y)), uHaze * 0.62, up);
           gl_FragColor = vec4(c, 1.0);
@@ -276,8 +290,8 @@ const EMISSIVE_GATE = 6.0;     /* higher = only the brightest texture areas glow
     new THREE.SphereGeometry(CEILING_R, 64, 24, 0, Math.PI * 2, 0, CEILING_ARC),
     new THREE.ShaderMaterial({
       side: THREE.DoubleSide, transparent: true, depthWrite: false, fog: false,
-      uniforms: { uCol: { value: new THREE.Color(ACCENT) },
-                  uBase: { value: new THREE.Color(0x0e1b13) },
+      uniforms: { uCol: { value: new THREE.Color(0xd8e2ea) },
+                  uBase: { value: new THREE.Color(0x121417) },
                   uCanopyR: { value: CANOPY_R } },
       vertexShader: `varying float vR; varying vec3 vL;
         void main(){
@@ -296,7 +310,7 @@ const EMISSIVE_GATE = 6.0;     /* higher = only the brightest texture areas glow
           float halo = 1.0 - smoothstep(0.0, uCanopyR * 0.16, abs(vR - uCanopyR));
           float slab = 1.0 - smoothstep(uCanopyR * 1.6, uCanopyR * 5.5, vR);
           float grain = 0.6 + 0.4 * fbm(vec2(atan(vL.z, vL.x) * 3.0, vR * 1.1) * 2.6);
-          vec3 col = uBase + uCol * (0.16 * pool + 0.20 * halo) * grain;
+          vec3 col = uBase + uCol * (0.10 * pool + 0.13 * halo) * grain;
           gl_FragColor = vec4(col, clamp(slab * 0.55 + pool * 0.30 + halo * 0.45, 0.0, 1.0));
         }`
     })
@@ -314,14 +328,14 @@ const EMISSIVE_GATE = 6.0;     /* higher = only the brightest texture areas glow
    gone too far. It is what stops the key light from being invisible: without
    something in the air to catch it, a spot in a dark room only shows where it
    lands, never that it travelled. */
-const SHAFT_OPACITY = 0.020;
+const SHAFT_OPACITY = 0.007;   /* cut hard: against a neutral background the cone started reading as a wedge */
 {
   const shaft = new THREE.Mesh(
     new THREE.ConeGeometry(1.75, 2.9, 48, 1, true),
     new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending, fog: false,
-      uniforms: { uCol: { value: new THREE.Color(KEY_TINT) }, uOp: { value: SHAFT_OPACITY } },
+      uniforms: { uCol: { value: new THREE.Color(0xffffff) }, uOp: { value: SHAFT_OPACITY } },
       vertexShader: `varying vec2 vUv; varying vec3 vN;
         void main(){ vUv = uv; vN = normalize(normalMatrix * normal);
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
@@ -374,20 +388,27 @@ const GREEN_RAMP = `
 /* Screen footage is graded onto the §2 tiers so arbitrary stock clips still
    leave green as the only hue in the viewport. Set HERO_ASSETS.screenGrade
    to 0 for raw footage colour. */
+/* SCREEN_GAIN is what stops the panels leading the frame. They were rendering
+   at full value and dominating everything; they are panels in a dark room, not
+   light sources. The ramp drive is pulled down too (1.15 -> 0.62) so mid
+   luminance lands in the ramp's dark tiers instead of at the top — that top-end
+   landing was what crushed every clip to the same flat bright green. */
+const SCREEN_GAIN = { value: 0.26 };
 const uGrade = { value: ASSETS.screenGrade ?? 1 };
 function screenMaterial(tex) {
-  /* fog:false — the screens are emissive panels, and hazing them would eat the
-     contrast that makes the on-screen text readable */
+  /* fog:false — hazing the panels would eat the contrast that keeps their
+     content legible at this brightness */
   const m = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, toneMapped: false, fog: false });
   m.onBeforeCompile = shader => {
     shader.uniforms.uGrade = uGrade;
-    shader.fragmentShader = `uniform float uGrade;\n${GREEN_RAMP}\n` + shader.fragmentShader.replace(
+    shader.uniforms.uGain = SCREEN_GAIN;
+    shader.fragmentShader = `uniform float uGrade; uniform float uGain;\n${GREEN_RAMP}\n` + shader.fragmentShader.replace(
       '#include <map_fragment>',
       `#include <map_fragment>
        {
          float l = pow(clamp(dot(diffuseColor.rgb, vec3(0.2126,0.7152,0.0722)), 0.0, 1.0), 1.0 / 2.2);
-         vec3 graded = pow(greenRamp(clamp(l * 1.15, 0.0, 1.0)), vec3(2.2));
-         diffuseColor.rgb = mix(diffuseColor.rgb, graded, uGrade);
+         vec3 graded = pow(greenRamp(clamp(l * 0.62, 0.0, 1.0)), vec3(2.2));
+         diffuseColor.rgb = mix(diffuseColor.rgb, graded, uGrade) * uGain;
        }`
     );
   };
@@ -614,25 +635,16 @@ new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
        of "green statue". There is no separate emissive map, so the brightest
        parts of the basecolor become the emitter: luminance raised to a power so
        only the top of the range survives, then pushed through the §2 accent.
-       EMISSIVE_GAIN scales it, EMISSIVE_GATE decides how selective it is. */
+       (Removed — see the note at the material below.) */
     const maxAniso = renderer.capabilities.getMaxAnisotropy();
     let glbMesh = null;
     model.traverse(o => {
       if (!o.isMesh || !o.material) return;
       o.material.envMapIntensity = ENV_INTENSITY;
-      o.material.onBeforeCompile = sh => {
-        sh.uniforms.uEmGain = { value: EMISSIVE_GAIN };
-        sh.uniforms.uEmGate = { value: EMISSIVE_GATE };
-        sh.uniforms.uEmCol = { value: new THREE.Color(ACCENT) };
-        sh.fragmentShader = 'uniform float uEmGain; uniform float uEmGate; uniform vec3 uEmCol;\n'
-          + sh.fragmentShader.replace('#include <emissivemap_fragment>',
-            `#include <emissivemap_fragment>
-             {
-               float lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-               float vein = pow(clamp(lum, 0.0, 1.0), uEmGate);
-               totalEmissiveRadiance += uEmCol * vein * uEmGain;
-             }`);
-      };
+      /* No emissive injection. It was pushing the basecolor through the accent
+         and adding a forced green glow on top of the GLB's own PBR — exactly
+         the "green multiply" that flattened the material. The maps are left to
+         speak for themselves. */
       o.material.needsUpdate = true;
       for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap']) {
         if (o.material[k]) { o.material[k].anisotropy = maxAniso; o.material[k].needsUpdate = true; }
@@ -791,9 +803,9 @@ composer.addPass(new RenderPass(scene, camera));
    device pixels to match the real pixel ratio. */
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(container.clientWidth * heroPixelRatio(), container.clientHeight * heroPixelRatio()),
-  0.45,   /* strength  — was 0.8  */
-  0.18,   /* radius    — was 0.6, tight so it never softens an edge */
-  0.72);  /* threshold — was 0.2; only genuine highlights bloom now */
+  0.20,   /* strength  — was 0.45 */
+  0.14,   /* radius    — tight so it never softens an edge */
+  0.90);  /* threshold — only the specular hotspots bloom, nothing else */
 composer.addPass(bloomPass);
 /* Grain kept at a whisper, scanlines off entirely (they were the crawl). Set
    FILM_STRENGTH to 0 to drop the pass's contribution completely. */
@@ -811,11 +823,13 @@ composer.addPass(filmPass);
        near-black without crushing the screens.
      - a vignette, to stop the corners competing with the centre.
    GRADE_* below are the only knobs; none of them soften an edge. */
-const GRADE_SHADOW   = new THREE.Color(0x6fd8ff);  /* cool bias applied in the darks */
-const GRADE_HIGH     = new THREE.Color(0xd6ffe4);  /* mint, reserved for real highlights */
-const GRADE_CONTRAST = 1.16;
-const GRADE_PIVOT    = 0.28;
-const GRADE_VIGNETTE = 0.55;
+/* Near-neutral. The old teal/mint split-tone was re-introducing hue into a
+   frame that is now meant to be neutral except for the model. */
+const GRADE_SHADOW   = new THREE.Color(0xa9b6c4);  /* a whisper cool in the darks */
+const GRADE_HIGH     = new THREE.Color(0xffffff);  /* highlights stay white       */
+const GRADE_CONTRAST = 1.06;
+const GRADE_PIVOT    = 0.16;   /* low pivot was crushing the grey backdrop to black */
+const GRADE_VIGNETTE = 0.42;
 const gradePass = new ShaderPass({
   uniforms: {
     tDiffuse: { value: null },
@@ -834,7 +848,7 @@ const gradePass = new ShaderPass({
       /* split-tone: darks toward teal, lights toward mint */
       float t = smoothstep(0.02, 0.55, l);
       vec3 tint = mix(uShadow, uHigh, t);
-      c.rgb *= mix(vec3(1.0), tint, 0.42);
+      c.rgb *= mix(vec3(1.0), tint, 0.14);
 
       /* contrast about a low pivot — deepens shadows, leaves highlights alone */
       c.rgb = clamp((c.rgb - uPivot) * uContrast + uPivot, 0.0, 1.0);
@@ -941,6 +955,7 @@ if (TUNE) {
   window.__film = filmPass;      /* .enabled = false to preview with no grain */
   window.__bloom = bloomPass;
   window.__grade = gradePass;
+  window.__screenGain = SCREEN_GAIN;
   window.__spot = spotLight;
   window.__rim = rimLight;
   console.log('[tune] on — __screens/__rig/__rigBody/__cam/__controls/__renderer/__film/__bloom');

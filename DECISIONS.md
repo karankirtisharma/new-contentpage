@@ -507,3 +507,61 @@ The ceiling itself is untouched, which was the constraint — the clamp was move
 to fit it, not the other way round. Verified by driving real drags through the
 browser: 1.60 -> 1.38 dragging one way, 1.60 -> 2.15 the other, and all three
 positions rendered to confirm the dome holds at both limits.
+
+## 7.10 · Neutral scene, green only in the material
+
+Matched to a client reference: a Blender-viewport render of the raw GLB on a
+plain grey backdrop. The complaint was that the build read as a colour filter
+over the viewport rather than as a lit object, and it was correct — green was
+being applied in **thirteen** places, only one of which was the model:
+
+lights (ambient / key / rim / fill), `scene.fog`, the backdrop shell, the PMREM
+env shell, the ceiling dome, the light shaft, the screen grade, the emissive
+injection, and the grade pass's split-tone. With a green key on a green
+material every highlight came back saturated green, which is exactly why the
+glass never read as glass — a specular highlight has to return the colour of
+the *light*, not of the surface.
+
+So: everything that lights the model or sits behind it is now neutral, and the
+only hue left in the frame comes from the GLB's own basecolor.
+
+| | before | after |
+|---|---|---|
+| ambient | `0x0d3330` 0.05 | `0x2a2e33` 0.42 |
+| key spot | `0xdaffe9` | `0xfff6ec` (white, a hair warm) |
+| rim | `0x35e8c4` 1.70 | `0xdfe9ff` 1.25 |
+| fill | `0x1aff5e` 0.10 | `0xffffff` 0.32 |
+| fog | `0x04160c` @ 0.085 | `0x0e1013` @ 0.055 |
+| backdrop | `0x03100a` → `0x2fbf63` | `0x0a0b0c` → `0x1a1c1e` |
+| ceiling pool | `ACCENT` | `0xd8e2ea` |
+| light shaft | `KEY_TINT` @ 0.020 | white @ 0.007 |
+| grade split-tone | teal/mint @ 0.42 | near-neutral @ 0.14 |
+| bloom | 0.45 / 0.18 / 0.72 | 0.20 / 0.14 / 0.90 |
+| exposure | 0.78 | 0.95 |
+
+**The emissive injection was deleted outright.** It pushed the basecolor through
+the accent and added a forced green glow on top of the GLB's own PBR — the
+"green multiply" that flattened the material. The maps now speak for themselves.
+
+**The env shell is deliberately much brighter than the visible backdrop**
+(`0x24282c` → `0xc2ccd4`, against a backdrop of `0x0a0b0c` → `0x1a1c1e`). It is
+never drawn; it only feeds PMREM. A near-mirror reflects the environment and
+almost nothing else, so an env matched to the dim background leaves the metal
+with nothing to return and it goes black — which is exactly what happened on the
+first neutral pass. A studio softbox is far brighter than the wall behind the
+subject; same principle. `ENV_INTENSITY` 2.5 -> 3.4 against the new shell.
+
+**Screens sit back now.** `SCREEN_GAIN` 0.26 plus the ramp drive pulled from
+1.15 to 0.62. The drive was the real culprit: at 1.15 mid luminance landed at
+the *top* of the tier ramp, so every clip resolved to the same flat bright
+green and the panels led the frame. At 0.62 they land in the dark tiers and
+read as filament detail on near-black panels.
+
+**Exposure went UP, not down**, 0.78 -> 0.95. Counter-intuitive against a brief
+asking for deeper shadows, but the green lights had been delivering far more
+energy than the neutral ones do; at 0.78 the neutral pass was nearly black.
+Depth comes from the grade's contrast curve and vignette instead, and
+`GRADE_PIVOT` moved 0.28 -> 0.16 because the higher pivot was crushing the grey
+backdrop gradient to black — the background has to be visible as a gradient.
+
+No geometry, position, camera or scroll behaviour was touched.
