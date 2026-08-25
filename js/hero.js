@@ -67,39 +67,39 @@ const SCROLL_SPIN     = 0.0016; /* radians of rig.rotation.y per scrolled design
    ORBIT_XZ with ORBIT_RISE of height relative to the target, so this is the
    angle the intro dolly lands on and the angle the orbit is now locked to.
    Retuning ORBIT_RISE or ORBIT_XZ moves the lock with it. */
-/* FRAMING — hiding the mount.
-   The canopy is a disc of world radius 1.651 seen from 3.47 away, so it
-   subtends about 50 degrees against a 44 degree horizontal frame: it filled the
-   top quarter of the shot and read as a saucer with a lid, whatever the ceiling
-   shader did underneath it. Two changes together push it out of frame.
+/* FRAMING — matched to a supplied reference frame.
+   Two knobs, and they are the whole composition.
 
-   FRAME_DROP lowers the orbit centre — the target AND the camera, together, so
+   FRAME_DROP lowers the orbit centre — the target AND the camera together, so
    the view direction is unchanged — which lifts everything in the frame by the
-   same amount. On its own it cannot finish the job: the canopy only clears the
-   top edge at a drop of ~0.65, and by then the machine has ridden so far up
-   that its bottom sits at 53% of the frame with the rest empty.
+   same amount. CAMERA_FOV then sets how much of the scene the frame holds.
 
-   So the lens does the rest. FOV 28.5 -> 20 crops the top (taking the canopy
-   with it) while magnifying about the frame centre, which pulls the machine's
-   tail back DOWN to 92% and widens it to fill the frame edge to edge. Drop and
-   lens have to move together; neither works alone.
+   The history matters, because these two have been pulled in opposite
+   directions. FOV went 28.5 -> 20 with a drop of 0.18 to push the canopy out of
+   shot: the canopy is a disc of world radius 1.651 seen from 3.47 away,
+   subtending ~50 degrees against a 44 degree frame, so it filled the top quarter
+   and read as a saucer with a lid. That worked — the lid edge went from 24.4%
+   down the frame to 3.2% — but it is a tight shot, and the reference frame
+   supplied afterwards is a wider one.
 
-   Measured at the shipped values, over all eight 45-degree steps of the orbit:
-   the canopy's far rim — the lid edge that used to cut across the frame — sits
-   at 3.2% down from the top, against 24.4% before, and the machine's bottom at
-   92.2-92.8% with the frame full edge to edge. Identical at every angle, since
-   the canopy is a disc and the scene is symmetric about Y.
+   FOV is now 34, fitted to that reference rather than chosen. Only the
+   HORIZONTAL fit is meaningful: #scene3d is a fixed 1024x629 box that chrome.js
+   scales, so a browser window shorter than the scaled canvas crops the bottom
+   by an unknown amount and every vertical measurement off a screenshot carries
+   that unknown. Width does not — the canvas always fills the viewport
+   horizontally. The reference has the machine spanning 14.5% to 85% of frame
+   width; at FOV 34 it spans 14.8% to 85.3%. FOV 33 gives 72.5% width and 35
+   gives 68.0%, so 34 is the fit, not a round number.
 
-   So the mount is reduced to a dark sliver along the very top edge, mostly
-   behind the spine, rather than removed outright. Taking it to exactly 0 needs
-   FOV 19 / drop 0.21, and at 19 the outer screens are cut hard at the frame
-   sides and the machine's head goes with them — a worse trade than a sliver
-   nobody reads as a lid.
+   Consequence, stated plainly: at 34 the canopy and the ceiling are back in
+   shot. Hiding them and matching this reference are not compatible — the mount
+   sits directly above the machine, so any frame wide enough to show the machine
+   with margin also shows the mount. The reference frame itself shows it.
 
-   #scene3d is a fixed 1024x629 box that chrome.js only scales, so the aspect is
-   1.628 on every device and this framing is identical everywhere. */
+   #scene3d's fixed box also means the aspect is 1.628 on every device, so a
+   vertical-FOV change is safe here in a way it would not be in a fluid layout. */
 const FRAME_DROP      = 0.18;   /* orbit centre below the machine's own centre */
-const CAMERA_FOV      = 20;     /* was 28.5 */
+const CAMERA_FOV      = 34;     /* 28.5 -> 20 to hide the mount, -> 34 to match the reference */
 
 /* Unaffected by FRAME_DROP: both are built from ORBIT_XZ and ORBIT_RISE, which
    are offsets RELATIVE to the orbit centre, so moving that centre moves the

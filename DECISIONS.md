@@ -883,3 +883,54 @@ centre -0.2971 against a machine centre of -0.1171, polar still pinned at
 `#scene3d` is a fixed 1024x629 box that chrome.js only scales, so the aspect is
 1.628 on every device and this framing is identical everywhere — a vertical FOV
 change is safe here in a way it would not be in a fluid layout.
+
+## 7.16 · FOV refitted to a supplied reference frame
+
+§7.15 narrowed the lens to 20 to push the mount out of shot. A reference frame
+supplied afterwards is a wider composition, and the FOV is now fitted to it.
+
+**Only the horizontal fit is meaningful, and that is a property of the layout.**
+`#scene3d` is a fixed 1024x629 box that chrome.js only scales, so on a 2000px
+viewport the canvas is 2000x1228 CSS px. A browser window shorter than that
+crops the bottom, and if the page is scrolled the crop is not even from the top
+— so every vertical measurement taken off a screenshot carries an unknown
+offset. Width carries none: the canvas always fills the viewport horizontally,
+so x fractions are exact.
+
+That was not academic. Fitting on all three of (width, canopy rim, machine
+bottom) against the reference produced no consistent solution — the best
+candidates were off by 40% on the rim and 10% on the bottom in opposite
+directions, which is the signature of a bad assumption, not a bad fit. Dropping
+the two cropped measurements resolved it immediately.
+
+| FOV | machine width, fraction of frame |
+|---|---|
+| 20 | 0.999 |
+| 28.5 | 0.804 |
+| 32 | 0.727 |
+| 33 | 0.725 |
+| **34** | **0.705** |
+| 35 | 0.680 |
+
+Reference: machine spanning 14.5% to 85.0% of frame width, i.e. 0.705. At
+**`CAMERA_FOV` 34** it spans 14.8% to 85.3%. Measured across all eight
+45-degree steps of the orbit the width holds at 0.699-0.706. 34 is the fit, not
+a round number.
+
+`FRAME_DROP` stays at 0.18 — the request was about the lens.
+
+**The mount is back in shot, and that is not reconcilable.** §7.15 hid the
+canopy and ceiling; this restores them. The mount sits directly above the
+machine, so any frame wide enough to show the machine with margin on both sides
+also shows the mount — and the supplied reference itself shows it. The two
+requests cannot both be satisfied; the reference is the newer instruction and
+wins.
+
+Nothing else moved. The height lock is intact on the shipped build: orbit
+centre -0.2971 against a machine centre of -0.1171, polar pinned at 1.5996.
+
+**Method note, for the next time a measurement is taken off the canvas:** sample
+the pixels BEFORE `toDataURL` and before any `await`. `preserveDrawingBuffer` is
+false, so the drawing buffer is cleared at the next yield and a `drawImage` after
+an awaited upload reads pure black. A whole sweep was silently zeroed this way
+before it was caught.
