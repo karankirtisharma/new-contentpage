@@ -47,13 +47,19 @@ body.chrome-in #scene3d canvas{opacity:1}
   opacity:0;transition:opacity .4s ease}
 body.tree-in #scene3d2 canvas{opacity:1}
 
-#preloader,#preloader2{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+/* ---- section 3: the neon screen display ---- */
+#scene3d3{position:absolute;left:0;top:1253px;width:1024px;height:629px;z-index:4}
+#scene3d3 canvas{display:block;width:100%!important;height:100%!important;
+  opacity:0;transition:opacity .4s ease}
+body.neon-in #scene3d3 canvas{opacity:1}
+
+#preloader,#preloader2,#preloader3{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   transform:translateY(-100px);z-index:3;pointer-events:none}
-#preloader .ring,#preloader2 .ring{width:80px;height:80px;border:1px solid var(--accent-deep);border-top-color:var(--accent);
+#preloader .ring,#preloader2 .ring,#preloader3 .ring{width:80px;height:80px;border:1px solid var(--accent-deep);border-top-color:var(--accent);
   border-radius:50%;animation:preSpin 1s linear infinite}
 @keyframes preSpin{to{transform:rotate(360deg)}}
 
 @media (prefers-reduced-motion:reduce){
-  #preloader .ring,#preloader2 .ring{animation:none}
+  #preloader .ring,#preloader2 .ring,#preloader3 .ring{animation:none}
   #scene3d canvas,#scene3d2 canvas{transition:none}
 }

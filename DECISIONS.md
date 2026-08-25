@@ -1095,3 +1095,74 @@ permute the same four. Every pool entry is known to load: two further Pexels
 ids were tried and both answered 403, which the per-element fallback swallowed
 silently while still costing a failed request on each load. Each element still
 falls back to a local loop, so the section never goes dark offline.
+
+# 9 · Section 3 — the neon screen display
+
+## 9.1 · The asset
+
+Third Tripo export in the set, and it ran through the same pipeline at the same
+settings with no edits: **52.6 MB → 1.97 MB**, 1,824,519 → 145,960 triangles
+(8.0% kept).
+
+Measured before building, because it is the first of the three whose numbers
+differ enough to change the treatment:
+
+| | rig | tree | neon |
+|---|---|---|---|
+| MR metalness median | 0.961 | 0.965 | **0.769** |
+| MR roughness median | 0.020 | 0.004 | **0.067** |
+| basecolor mean sRGB | .19/.31/.09 | .026/.143/.024 | .074/.151/.043 |
+| bbox | — | 0.980 x 0.721 x 0.450 | 0.983 x 0.486 x 0.984 |
+
+Milder mirror than the other two, so `METALNESS_SCALE` is 0.25 here against
+their 0.15. The roughness lift is unchanged — 0.067 is still a mirror.
+
+## 9.2 · The screens are real geometry, and that changes the approach
+
+The tree needed its video planes placed by hand because it had no flat faces.
+This one is the opposite. Clustering every triangle by normal and plane offset
+over the source turns up six large coplanar faces, all at y ~0.18 on a circle of
+radius ~0.42, areas 0.0361-0.0380 — the panels. So the video is **cut from the
+mesh**, the way the hero's screens are: the footage cannot sit crooked and
+cannot spill past a bezel, because the geometry *is* the face.
+
+**The outward test is the part that matters.** Every panel has a twin face about
+0.09 behind it, facing inward, of almost the same area (0.0334, 0.0332). Taking
+the six largest clusters happens to return the six front faces on this asset,
+and that would be luck — a slightly different simplification ratio could flip a
+pair. The filter requires `dot(normal, centroidXZ) > 0` instead, which is a
+property of what a display face *is* rather than of this particular export.
+
+Extracted at runtime: 6 faces, 0.468-0.570 x 0.325-0.331 each. The consistent
+height across all six against varying triangle counts (89 to 536) is the sign
+the clustering found whole faces rather than fragments.
+
+Cover-fit and the 14% top crop are carried over from §7.14 unchanged — the clip
+with the baked-in bright header is in this pool too.
+
+## 9.3 · Two framing corrections
+
+**The fit was measured against the wrong thing.** `FIT_WIDTH` frames the stage's
+centre, but the stage's near edge sits 0.49 closer to the camera, so at 0.92 the
+near rim rendered half again as large as the fit assumed and spilled off the
+bottom of the frame while the canopy left the top. 0.72 leaves the near edge
+room to be nearer.
+
+**The floor was brighter than the screens.** Two causes, both from the same
+fact: this model is mostly a pair of wide discs facing straight up. A key with
+much elevation lands square on them, and an up-facing surface reflects the
+environment's *upper* hemisphere across its whole area. So the key and rim were
+dropped to grazing elevations (1.8 → 0.85, 1.6 → 0.9), `ENV_INTENSITY` went
+1.1 → 0.55 and the env's sky from `0xc2ccd4` to `0x7c848c`. The panels barely
+notice — they are vertical and take their light from the key.
+
+## 9.4 · Wiring
+
+`#scene3d3` at `top: 1253px`, chrome.js PAGE_H 624+629 → 624+629+629. Its own
+WebGL context, gated on an IntersectionObserver like the other two, so at most
+one section is drawing at a time. The stage turns slowly (0.4 rpm) rather than
+sitting still, which is what brings all six panels round — unlike the tree,
+this model *is* in the round.
+
+Six screens draw from the same shuffled stock-plus-local pool. With six to fill
+and only four stock URLs, the local loops in the pool are doing real work here.

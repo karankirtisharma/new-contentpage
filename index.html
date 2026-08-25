@@ -27,6 +27,14 @@
   <div id="scene3d2">
     <div id="preloader2"><div class="ring"></div></div>
   </div>
+
+  <!-- ===================== SECTION 3 — the neon screen display =====================
+       Third stacked section, same design canvas. Unlike the tree, this model has
+       real flat display faces, so js/neon.js cuts the video surfaces out of the
+       mesh the way the hero does rather than placing them. -->
+  <div id="scene3d3">
+    <div id="preloader3"><div class="ring"></div></div>
+  </div>
 </div>
 
 <script type="importmap">
@@ -79,9 +87,26 @@ window.TREE_ASSETS = {
   placeholderDir: 'placeholders/',
   screenGrade: 1
 };
+
+/* Section 3. Six panels, and unlike the tree they are real flat faces, so the
+   video geometry is cut from the mesh. Same shuffled pool — with six screens to
+   fill, the local loops in the pool matter more here than anywhere. */
+window.NEON_ASSETS = {
+  model: 'assets-final/neon-screens.glb',
+  stock: [
+    'https://videos.pexels.com/video-files/3576378/3576378-hd_1280_720_25fps.mp4',
+    'https://videos.pexels.com/video-files/2098989/2098989-hd_1280_720_30fps.mp4',
+    'https://videos.pexels.com/video-files/2278095/2278095-hd_1280_720_30fps.mp4',
+    'https://videos.pexels.com/video-files/1851190/1851190-hd_1280_720_25fps.mp4'
+  ],
+  placeholders: ['screen-a.mp4','screen-b.mp4','screen-c.mp4','screen-d.mp4'],
+  placeholderDir: 'placeholders/',
+  screenGrade: 1
+};
 </script>
 <script src="js/chrome.js"></script>
 <script type="module" src="js/hero.js"></script>
 <script type="module" src="js/tree.js"></script>
+<script type="module" src="js/neon.js"></script>
 </body>
 </html>
