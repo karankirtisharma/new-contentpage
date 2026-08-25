@@ -1,0 +1,17 @@
+{
+  "name": "hero-section-creative-page",
+  "private": true,
+  "type": "module",
+  "description": "Dev-only asset pipeline. Nothing here ships — the site is static (index.html + css/ + js/ + assets-final/). See DECISIONS.md 7.1 for why the two qa/ steps must stay separate processes.",
+  "scripts": {
+    "asset:textures": "node qa/step1-textures.mjs",
+    "asset:geometry": "node qa/step2-geometry.mjs"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "^4.1.1",
+    "@gltf-transform/extensions": "^4.1.1",
+    "@gltf-transform/functions": "^4.1.1",
+    "meshoptimizer": "^0.22.0",
+    "sharp": "^0.33.5"
+  }
+}

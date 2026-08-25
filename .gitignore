@@ -5,3 +5,7 @@
 /source/
 # QA output
 /qa/*.png
+
+# dev-only asset pipeline deps
+/node_modules/
+/package-lock.json

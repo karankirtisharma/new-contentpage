@@ -19,6 +19,14 @@
   <div id="scene3d">
     <div id="preloader"><div class="ring"></div></div>
   </div>
+
+  <!-- ===================== SECTION 2 — the holographic tree =====================
+       Same 1024px design canvas, stacked directly under the hero. Its own WebGL
+       context in js/tree.js: the two scenes share no state, and each pauses its
+       loop when it scrolls out of view. -->
+  <div id="scene3d2">
+    <div id="preloader2"><div class="ring"></div></div>
+  </div>
 </div>
 
 <script type="importmap">
@@ -52,8 +60,28 @@ window.HERO_ASSETS = {
   finalDir: 'assets-final/',
   placeholderDir: 'placeholders/'
 };
+
+/* Section 2. The tree is the same kind of asset as the rig — a Tripo export,
+   one node, one mesh, one material, three maps — so it runs through the same
+   pipeline and carries the same degenerate metallic-roughness map.
+   Its four pods get a clip each, drawn at RANDOM from the pool below on every
+   load, so the section is not the same four videos every time. */
+window.TREE_ASSETS = {
+  model: 'assets-final/holographic-tree.glb',
+  /* shuffled per load; falls back to the local procedural loops offline */
+  stock: [
+    'https://videos.pexels.com/video-files/3576378/3576378-hd_1280_720_25fps.mp4',
+    'https://videos.pexels.com/video-files/2098989/2098989-hd_1280_720_30fps.mp4',
+    'https://videos.pexels.com/video-files/2278095/2278095-hd_1280_720_30fps.mp4',
+    'https://videos.pexels.com/video-files/1851190/1851190-hd_1280_720_25fps.mp4'
+  ],
+  placeholders: ['screen-a.mp4','screen-b.mp4','screen-c.mp4','screen-d.mp4'],
+  placeholderDir: 'placeholders/',
+  screenGrade: 1
+};
 </script>
 <script src="js/chrome.js"></script>
 <script type="module" src="js/hero.js"></script>
+<script type="module" src="js/tree.js"></script>
 </body>
 </html>
