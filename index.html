@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>[YOUR MARK]™ — hero</title>
+<meta name="description" content="Fullscreen energy-machine hero scene."/>
+<!-- coarse-pointer devices get the 1024 desktop composition, scaled down -->
+<script>if(matchMedia('(pointer: coarse)').matches){var v=document.querySelector('meta[name=viewport]');if(v)v.setAttribute('content','width=1024, user-scalable=no, viewport-fit=cover');}</script>
+<link rel="stylesheet" href="css/hero.css"/>
+</head>
+<body id="top">
+
+<!-- ===================== SCALED PAGE (the hero itself) =====================
+     Fullbleed 3D canvas, nothing overlaid. The fixed chrome layer, the minimap,
+     the stamp and the night-vision toggle were all removed; js/chrome.js keeps
+     only the 1024px design-canvas scaling. -->
+<div id="page">
+  <div id="scene3d">
+    <div id="preloader"><div class="ring"></div></div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+} }
+</script>
+<script>
+/* Finals dropped into /assets-final/ are picked up automatically; the screen
+   loops still fall back to stock and then to the local procedural clips. The
+   rig itself no longer has a fallback — a missing GLB is a loud console error. */
+window.HERO_ASSETS = {
+  model:   'assets-final/hero-rig.glb',
+  screens: ['screen-a.mp4','screen-b.mp4','screen-c.mp4','screen-d.mp4'],
+  /* flip to true once real screen finals are dropped into assets-final/ —
+     until then the loader skips that step instead of 404ing four times */
+  finalScreens: false,
+  /* Screen footage until finals land: free Pexels stock (Pexels licence — free
+     to use, no attribution required). CORS-enabled, which a WebGL video texture
+     requires. Swap any URL freely; each falls back to its local loop offline. */
+  stock: [
+    'https://videos.pexels.com/video-files/3576378/3576378-sd_640_360_25fps.mp4',
+    'https://videos.pexels.com/video-files/2098989/2098989-sd_640_360_30fps.mp4',
+    'https://videos.pexels.com/video-files/2278095/2278095-sd_640_360_30fps.mp4',
+    'https://videos.pexels.com/video-files/1851190/1851190-sd_640_360_25fps.mp4'
+  ],
+  screenGrade: 1,          /* 1 = graded onto the §2 green tiers, 0 = raw footage colour */
+  finalDir: 'assets-final/',
+  placeholderDir: 'placeholders/'
+};
+</script>
+<script src="js/chrome.js"></script>
+<script type="module" src="js/hero.js"></script>
+</body>
+</html>

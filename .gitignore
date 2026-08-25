@@ -1,0 +1,7 @@
+# study material only — never shipped, never served
+/reference/
+# raw model source — the 57 MB Tripo export. Only the optimised
+# assets-final/hero-rig.glb is shipped; rebuild with qa/step1+step2.
+/source/
+# QA output
+/qa/*.png

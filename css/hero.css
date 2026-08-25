@@ -1,0 +1,44 @@
+/* =====================================================================
+   HERO CHROME — 1024px design canvas.
+   Every position/size below is measured from the reference mirror's first
+   <style> block. Colours follow HERO_SPEC §2 (red -> green), neutrals kept.
+   The overlay chrome (brand, mail, music, INVERT SITE, badge icons, minimap,
+   stamp, night-vision toggle) was removed, and so was the scanline veil that
+   used to sit over the canvas — the scene reads sharper without it. Only the
+   stage, the design-canvas layer and the preloader remain.
+   ===================================================================== */
+
+:root{
+  /* ---- §2 green token system: the only accent hue in the viewport ---- */
+  --accent:#19e65a;        /* signal: floor lines, ring, preloader           */
+  --accent-deep:#145c2e;   /* deep accent: preloader track                   */
+  --stage:#000;
+  --grey:#818181;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--stage);-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html{scrollbar-width:thin;scrollbar-color:var(--accent) var(--stage)}
+::-webkit-scrollbar{width:10px;background:var(--stage)}
+::-webkit-scrollbar-thumb{background:var(--accent)}
+body{
+  font-family:ui-monospace,"Cascadia Mono","Consolas","DejaVu Sans Mono",monospace;
+  color:var(--grey);overflow-x:hidden;min-height:100vh;
+}
+
+/* ---- scaled design layer (1024px design width) ---- */
+#page{position:relative;width:1024px;transform-origin:0 0}
+
+/* ---- the 3D stage ---- */
+#scene3d{position:absolute;left:0;top:-5px;width:1024px;height:629px;z-index:4}
+#scene3d canvas{display:block;width:100%!important;height:100%!important;
+  cursor:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='128' height='34'><path d='M15 2v26M2 15h26' stroke='white' stroke-width='2.2'/><text x='34' y='9' fill='%23999999' font-family='monospace' font-size='9' letter-spacing='0.5'>ROTATE 3D</text></svg>") 15 15, crosshair}
+#preloader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  transform:translateY(-100px);z-index:3;pointer-events:none}
+#preloader .ring{width:80px;height:80px;border:1px solid var(--accent-deep);border-top-color:var(--accent);
+  border-radius:50%;animation:preSpin 1s linear infinite}
+@keyframes preSpin{to{transform:rotate(360deg)}}
+
+@media (prefers-reduced-motion:reduce){
+  #preloader .ring{animation:none}
+}
