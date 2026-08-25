@@ -618,12 +618,26 @@ Promise.all([Promise.race([Promise.all([modelP, heroVideoP]), timeoutP]), minLoa
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-controls.rotateSpeed = 0.4;
 /* auto-rotation is applied by hand in animate() so the intro hands off with
    zero velocity jump — OrbitControls' damped autoRotate ramps from 0 and hitches */
 controls.autoRotate = false;
-controls.minPolarAngle = 1.35;
-controls.maxPolarAngle = 1.65;
+/* Vertical drag range. This used to be [1.35, 1.65] — a 17 degree band with the
+   camera resting at 1.60, which left about 0.05 rad of downward travel and made
+   the up/down drag feel dead.
+   The upper bound is set by the ceiling, not by taste: the orbit target sits at
+   y -0.098 with a radius of 3.473, so the camera height is
+   -0.098 + 3.473*cos(polar). Polar 1.38 already puts it at y 0.561, only 0.06
+   under the dome's pole at CEILING_Y 0.62 — legal, but that close the dome
+   flattens to an edge-on band and stops reading as a ceiling. 1.42 keeps it
+   0.20 clear, which holds the dome at every angle in the range. Below ~1.36 the
+   camera climbs above the ceiling outright and the "hanging in a room" read
+   collapses.
+   So the top end stays tight and the range opens downward instead, where
+   nothing is in the way. 1.42..2.15 is 42 degrees against the old 17, and the
+   direction that was dead (down, 0.05 rad) is now the roomy one (0.55). */
+controls.minPolarAngle = 1.42;   /* camera y 0.424 — keeps the dome readable */
+controls.maxPolarAngle = 2.15;   /* camera y -2.14 — looking up from below */
+controls.rotateSpeed = 0.55;     /* was 0.4; the wider band wants a bit more travel per px */
 controls.enableZoom = false;
 controls.enablePan = false;
 let userHold = false;

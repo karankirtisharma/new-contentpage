@@ -479,3 +479,31 @@ dome curves away at the sides and reads as something the room actually has.
 meets it flush and the 7.7 assertion still holds. The shader gained fbm
 mottling on top of the pool and rim halo, so the surface reads as material
 rather than as a gradient.
+
+## 7.9 · Vertical drag was clamped almost shut
+
+`minPolarAngle` / `maxPolarAngle` were `[1.35, 1.65]` — a 17 degree band — while
+the camera rests at 1.60. That left roughly 0.05 rad of downward travel and
+0.25 up, which is why the drag felt locked on the vertical axis while the
+horizontal one felt fine.
+
+The upper bound is dictated by the ceiling, not by taste. The orbit target sits
+at y -0.098 with a radius of 3.473, so camera height is
+`-0.098 + 3.473 * cos(polar)`:
+
+| polar | camera y | vs the dome pole at 0.62 |
+|---|---|---|
+| 1.30 | 0.831 | above the ceiling — the read collapses |
+| 1.38 | 0.561 | legal, but only 0.06 clear; the dome flattens to an edge-on band |
+| 1.42 | 0.424 | 0.20 clear — the dome still reads as a dome |
+| 2.15 | -1.999 | looking up from underneath |
+
+So the top end stays tight at **1.42** and the range opens *downward* instead,
+where nothing is in the way: **[1.42, 2.15]**, 42 degrees against the old 17,
+and the direction that was dead (0.05 rad) is now the roomy one (0.55).
+`rotateSpeed` 0.4 -> 0.55, since the wider band wants more travel per pixel.
+
+The ceiling itself is untouched, which was the constraint — the clamp was moved
+to fit it, not the other way round. Verified by driving real drags through the
+browser: 1.60 -> 1.38 dragging one way, 1.60 -> 2.15 the other, and all three
+positions rendered to confirm the dome holds at both limits.
