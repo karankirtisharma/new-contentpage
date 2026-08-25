@@ -45,6 +45,11 @@ which lives under `rig`. The model's bounding-box top is placed exactly at
 `CEILING_Y` so it hangs from the mount with no gap. Scroll drives exactly one
 value — `rig.rotation.y`. There is no scroll lift, no tilt, no mouse parallax.
 
+**Atmosphere.** `FogExp2` gives the rig depth, but fog only tints geometry — so
+a backdrop shell (an inside-out sphere with an fbm-broken gradient) is what the
+haze actually lands on, and the ceiling is a shallow spherical cap rather than a
+flat plane, because seen from below a plane collapses to a hard straight edge.
+
 **One accent hue.** Black stage, green as the only emotional colour. A single
 `GREEN_RAMP` (black → `#02160b` → `#0a3d1f` → `#148f43` → `#19e65a` → `#8affb0`
 → `#eafff2`) grades the screen footage, so arbitrary stock clips never drop a

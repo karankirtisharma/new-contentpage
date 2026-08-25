@@ -31,10 +31,12 @@ const AMBIENT = 0x405a4a;         /* cool green-grey (was 0x404060)    */
    RIG_TARGET_DIAG; RIG_Y_STRETCH is deliberately 1.0 — the 1.2 that used to
    live here was tuned for the procedural box mast and visibly distorts a real
    asset. */
-const RIG_TARGET_DIAG = 2.0;    /* world-space diagonal the model is scaled to */
+const RIG_TARGET_DIAG = 3.6;    /* world-space diagonal the model is scaled to */
 const RIG_Y_STRETCH   = 1.0;    /* was 1.2 — a box-rig hack, never for a real asset */
 const CEILING_Y       = 0.62;   /* mount plane: the model's bbox top lands exactly here */
-const CEILING_R       = 6.0;    /* wide enough to fill the top of frame as a real ceiling */
+const CEILING_R       = 7.0;    /* dome radius; wide enough to fill the top of frame */
+const CEILING_ARC     = 0.42;   /* radians of the dome cap — how far it curves away */
+const FOG_DENSITY     = 0.115;  /* FogExp2; depth separation without hiding the rig */
 /* The orbit target is lifted to the machine's own centre and the camera is set
    a little BELOW it, so the shot looks slightly upward and the ceiling is seen
    from underneath — the only way the mount reads as a mount. Both are derived
@@ -140,6 +142,56 @@ const ENV_INTENSITY = 15.0;
   key.geometry.dispose(); key.material.dispose();
 }
 
+/* ------------------------------------------------------- ATMOSPHERE
+   Fog gives the rig depth — the far arms sink back instead of reading as one
+   flat cutout. But fog only tints geometry, never empty space, so on a black
+   background it would do nothing to the frame. The backdrop shell is what the
+   fog colour actually lands on: a big inside-out sphere carrying a vertical
+   gradient broken up by fbm noise, so the emptiness behind the machine has
+   some drift in it rather than being a flat black card.
+   ShaderMaterial ignores scene.fog by default, which is what we want here —
+   the backdrop *is* the haze, it should not be fogged on top of itself. */
+const NOISE_GLSL = `
+  float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float vnoise(vec2 p){
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(h21(i), h21(i + vec2(1,0)), u.x),
+               mix(h21(i + vec2(0,1)), h21(i + vec2(1,1)), u.x), u.y);
+  }
+  float fbm(vec2 p){
+    float v = 0.0, a = 0.5;
+    for (int i = 0; i < 5; i++) { v += a * vnoise(p); p *= 2.02; a *= 0.5; }
+    return v;
+  }`;
+
+scene.fog = new THREE.FogExp2(0x04160c, FOG_DENSITY);
+{
+  const backdrop = new THREE.Mesh(
+    new THREE.SphereGeometry(22, 32, 24),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false,
+      uniforms: { uDeep: { value: new THREE.Color(0x03100a) },
+                  uHaze: { value: new THREE.Color(0x2fbf63) } },
+      vertexShader: `varying vec3 vP;
+        void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      fragmentShader: `uniform vec3 uDeep; uniform vec3 uHaze; varying vec3 vP;
+        ${NOISE_GLSL}
+        void main(){
+          float band = smoothstep(-0.85, 0.85, vP.y);            /* haze gathers upward */
+          float drift = fbm(vec2(atan(vP.z, vP.x) * 1.6, vP.y * 2.4) * 2.2);
+          /* a soft bloom of light behind the machine, so it sits IN the haze
+             rather than in front of a flat wall of it */
+          float core = pow(1.0 - clamp(abs(vP.y) * 1.35, 0.0, 1.0), 2.0);
+          float a = band * (0.30 + 0.70 * drift) + core * 0.34 * (0.5 + 0.5 * drift);
+          gl_FragColor = vec4(mix(uDeep, uHaze, clamp(a, 0.0, 1.0) * 0.55), 1.0);
+        }`
+    })
+  );
+  backdrop.renderOrder = -2;
+  scene.add(backdrop);
+}
+
 /* ------------------------------------------------------------- CEILING
    The rig hangs from this like a ceiling fan: the model's bbox top is placed
    exactly at CEILING_Y, and the plane sits in world space (not under `rig`),
@@ -147,40 +199,46 @@ const ENV_INTENSITY = 15.0;
    the environment — the spot is above it — which is what makes it read as a
    dark slab the machine is bolted to rather than another glowing surface. */
 {
-  /* Shaded by hand rather than lit: every light sits above this plane, so a lit
-     material would leave the underside pure black and the mount would read as
-     nothing. Instead a dark disc that fades out before its own rim (no hard
-     edge in frame) with an accent pool around the mount point.
+  /* Shaded by hand rather than lit: every light sits above this surface, so a
+     lit material would leave the underside pure black and the mount would read
+     as nothing. Instead the ceiling is drawn: a dark slab, an accent pool where
+     the fixture spills light onto it, a rim halo at the disc's edge, and fbm
+     mottling so it reads as a real surface rather than a gradient.
 
-     Bounded, not infinite, and deliberately so. The idle camera sits at eye
-     height 0.762 looking at the origin with a 28.5 deg FOV, which leaves only
-     ~1.5 deg of frame above eye level: an infinite ceiling plane at any height
-     the machine can also fit under is either backfaced (invisible) or, seen
-     from above, floods the lower frame like a floor. A disc reads as the plate
-     the machine is bolted to without either failure. See DECISIONS.md — the
-     real fix is raising the orbit target, which needs sign-off. */
+     It is a shallow spherical cap, not a flat plane. Seen from underneath a
+     flat plane collapses to a hard straight edge across the frame; a dome
+     curves away at the sides and reads as something the room actually has. The
+     cap's pole sits exactly at CEILING_Y, which is where the model's bbox top
+     is placed, so the shaft meets it flush. */
   const ceiling = new THREE.Mesh(
-    new THREE.CircleGeometry(CEILING_R, 64),
+    new THREE.SphereGeometry(CEILING_R, 64, 24, 0, Math.PI * 2, 0, CEILING_ARC),
     new THREE.ShaderMaterial({
-      side: THREE.DoubleSide, transparent: true, depthWrite: false,
-      uniforms: { uCol: { value: new THREE.Color(ACCENT) }, uBase: { value: new THREE.Color(0x0e1b13) } },
-      vertexShader: `varying vec2 vUv;
-        void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: `uniform vec3 uCol; uniform vec3 uBase; varying vec2 vUv;
+      side: THREE.DoubleSide, transparent: true, depthWrite: false, fog: false,
+      uniforms: { uCol: { value: new THREE.Color(ACCENT) },
+                  uBase: { value: new THREE.Color(0x0e1b13) },
+                  uArc: { value: CEILING_ARC } },
+      vertexShader: `varying float vT; varying vec3 vL;
         void main(){
-          float d = length(vUv - 0.5) * 2.0;              /* 0 at the mount, 1 at the rim */
-          /* light spilling off the fixture onto the ceiling it is bolted to —
-             this is what actually sells the join, more than the slab does */
-          float pool = 1.0 - smoothstep(0.0, 0.24, d);
-          float halo = 1.0 - smoothstep(0.0, 0.055, abs(d - 0.115));  /* rim right at the disc edge */
-          float slab = 1.0 - smoothstep(0.26, 0.92, d);   /* slab fades before its own edge */
-          vec3 col = uBase + uCol * (0.30 * pool + 0.22 * halo);
-          gl_FragColor = vec4(col, clamp(slab * 0.85 + pool * 0.7 + halo * 0.5, 0.0, 1.0));
+          vL = position;
+          vT = acos(clamp(normalize(position).y, -1.0, 1.0));   /* polar angle from the pole */
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+        }`,
+      fragmentShader: `uniform vec3 uCol; uniform vec3 uBase; uniform float uArc;
+        varying float vT; varying vec3 vL;
+        ${NOISE_GLSL}
+        void main(){
+          float d = clamp(vT / uArc, 0.0, 1.0);            /* 0 at the mount, 1 at the rim */
+          float pool = 1.0 - smoothstep(0.0, 0.34, d);     /* spill from the fixture */
+          float halo = 1.0 - smoothstep(0.0, 0.07, abs(d - 0.16));  /* rim at the disc edge */
+          float slab = 1.0 - smoothstep(0.34, 0.98, d);
+          float grain = 0.55 + 0.45 * fbm(vec2(atan(vL.z, vL.x) * 3.0, d * 7.0) * 2.6);
+          vec3 col = uBase + uCol * (0.42 * pool + 0.30 * halo) * grain;
+          gl_FragColor = vec4(col, clamp(slab * 0.9 + pool * 0.75 + halo * 0.6, 0.0, 1.0));
         }`
     })
   );
-  ceiling.rotation.x = Math.PI / 2;   /* face down, toward the camera */
-  ceiling.position.y = CEILING_Y;
+  /* sphere centre dropped by the radius so the cap's pole lands on CEILING_Y */
+  ceiling.position.y = CEILING_Y - CEILING_R;
   ceiling.renderOrder = -1;
   scene.add(ceiling);
 }
@@ -219,7 +277,9 @@ const GREEN_RAMP = `
    to 0 for raw footage colour. */
 const uGrade = { value: ASSETS.screenGrade ?? 1 };
 function screenMaterial(tex) {
-  const m = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, toneMapped: false });
+  /* fog:false — the screens are emissive panels, and hazing them would eat the
+     contrast that makes the on-screen text readable */
+  const m = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, toneMapped: false, fog: false });
   m.onBeforeCompile = shader => {
     shader.uniforms.uGrade = uGrade;
     shader.fragmentShader = `uniform float uGrade;\n${GREEN_RAMP}\n` + shader.fragmentShader.replace(

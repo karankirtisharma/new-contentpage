@@ -445,3 +445,37 @@ dolly's start pose when the promise resolved. Three fixes, all in that order:
 Verified frame by frame: at 500ms only the preloader is on screen, at 1100ms the
 canvas is fading in with the dolly already at its start, and 1900-5200ms is one
 continuous pull-back with no jump.
+
+## 7.8 · Scale, atmosphere, and the ceiling as a dome
+
+Matched against a reference render supplied by the client. Three changes.
+
+**`RIG_TARGET_DIAG` 2.0 -> 3.6.** The reference has the machine filling the
+frame; at 2.0 it sat in the middle of a lot of empty black. This is safe to
+change now precisely because 7.5 made the screens geometry cut from the mesh
+and 7.7 derives `ORBIT_Y` from the loaded model — the screens, the ceiling
+alignment and the orbit centre all follow the constant instead of having to be
+retuned behind it. Checked at three orbit azimuths: nothing clips.
+
+**Fog needed something to land on.** `scene.fog` only tints geometry, never
+empty space, so `FogExp2` alone on a black background does nothing to the frame
+— it would haze the rig and leave the emptiness behind it flat. So there are
+two pieces: `FogExp2` at 0.115 for depth separation across the machine (the far
+arms sink back instead of reading as one flat cutout), plus a backdrop shell —
+a 22-unit inside-out sphere carrying a vertical gradient broken up by fbm noise,
+with a soft core glow so the machine sits *in* the haze rather than in front of
+a wall of it. The backdrop is a `ShaderMaterial`, which ignores `scene.fog` by
+default: it *is* the haze and must not be fogged on top of itself.
+
+The screen material takes `fog: false`. The screens are emissive panels, and
+hazing them eats exactly the contrast that makes the on-screen text readable —
+which 7.6 had just spent the effort to win.
+
+**The ceiling is a spherical cap now, not a flat disc.** Seen from underneath a
+flat plane collapses to a hard straight edge ruled across the frame. A shallow
+dome curves away at the sides and reads as something the room actually has.
+`CEILING_ARC` (0.42 rad) sets how far it wraps; the cap's pole sits exactly at
+`CEILING_Y`, which is where the model's bbox top is pinned, so the shaft still
+meets it flush and the 7.7 assertion still holds. The shader gained fbm
+mottling on top of the pool and rim halo, so the surface reads as material
+rather than as a gradient.
