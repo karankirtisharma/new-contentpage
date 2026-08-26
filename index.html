@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>[YOUR MARK]™ — hero</title>
-<meta name="description" content="Fullscreen energy-machine hero scene."/>
+<title>CYPHERNAUT — turn complexity into signal</title>
+<meta name="description" content="Content engine for Web3, AI and beyond. We build strategy, content and systems that turn complex ideas into immersive experiences."/>
 <!-- coarse-pointer devices get the 1024 desktop composition, scaled down -->
 <script>if(matchMedia('(pointer: coarse)').matches){var v=document.querySelector('meta[name=viewport]');if(v)v.setAttribute('content','width=1024, user-scalable=no, viewport-fit=cover');}</script>
 <link rel="stylesheet" href="css/hero.css"/>
@@ -12,12 +12,64 @@
 <body id="top">
 
 <!-- ===================== SCALED PAGE (the hero itself) =====================
-     Fullbleed 3D canvas, nothing overlaid. The fixed chrome layer, the minimap,
-     the stamp and the night-vision toggle were all removed; js/chrome.js keeps
-     only the 1024px design-canvas scaling. -->
+     The 3D stage, with the chrome overlaid on top of it. Everything lives in the
+     1024px design canvas that chrome.js scales, so the layout holds together at
+     any viewport width. The overlay is pointer-events:none as a whole and turns
+     them back on only for the things you can actually click, so dragging the rig
+     still works everywhere else. -->
 <div id="page">
   <div id="scene3d">
     <div id="preloader"><div class="ring"></div></div>
+  </div>
+
+  <div id="chrome">
+
+    <header class="nav">
+      <a class="brand" href="#top"><span class="brand-mark" aria-hidden="true"></span>CYPHERNAUT</a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#services">SERVICES</a>
+        <a href="#work">WORK</a>
+        <a href="#about">ABOUT</a>
+        <a href="#insights">INSIGHTS</a>
+      </nav>
+      <a class="cta" href="#start">START A PROJECT<span class="tick" aria-hidden="true"></span></a>
+    </header>
+
+    <div class="crumb"><b>01</b> / HOME<i class="rule"></i><span class="plus" aria-hidden="true"></span></div>
+
+    <div class="rail-l" aria-hidden="true">
+      <b>01</b>
+      <span class="plus"></span>
+      <i class="dots"></i>
+    </div>
+
+    <div class="rail-r" aria-hidden="true">
+      <span class="plus"></span>
+      <dl class="coords">
+        <div><dt>X:</dt><dd id="coordX">1042</dd></div>
+        <div><dt>Y:</dt><dd id="coordY">008</dd></div>
+        <div><dt>Z:</dt><dd id="coordZ">-37</dd></div>
+      </dl>
+    </div>
+
+    <div class="lede">
+      <p class="eyebrow">CONTENT ENGINE FOR WEB3, AI &amp; BEYOND</p>
+      <h1>TURN COMPLEXITY<br/>INTO <em>SIGNAL.</em></h1>
+      <p class="sub">We build strategy, content and systems that<br/>turn complex ideas into immersive experiences<br/>that educate, engage and grow communities.</p>
+      <a class="cta cta-lg" href="#services">EXPLORE SERVICES<span class="tick" aria-hidden="true"></span></a>
+    </div>
+
+    <div class="scroll" aria-hidden="true">
+      <span>SCROLL TO INITIALIZE</span>
+      <i class="mouse"></i>
+    </div>
+
+    <div class="status" aria-hidden="true">
+      <p class="status-k">SYSTEM STATUS</p>
+      <p class="status-v">ONLINE <i class="dot"></i></p>
+      <p class="ver">VER. 3.1.7</p>
+    </div>
+
   </div>
 </div>
 

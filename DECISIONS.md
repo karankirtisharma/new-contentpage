@@ -1250,3 +1250,47 @@ Deleting the lights left `window.__lights = { key: keyLight, ... }` in the
 console errors that appeared to persist after the fix were stale entries from
 the previous page load — confirmed by re-fetching the served file and checking
 that the tune block now runs to completion.
+
+# 11 · The hero chrome, built to the supplied design
+
+The overlay that §7 had stripped out is back, laid out against the supplied hero
+design rather than the old reference mirror: nav bar, breadcrumb, two rails of
+instrument readouts, the headline block, a scroll cue and a status corner.
+
+**It lives inside `#page`.** That is the whole reason the layout holds: chrome.js
+scales `#page` by `viewportWidth / 1024`, so the chrome and the 3D stage scale as
+one piece and nothing has to be re-solved per breakpoint. Positions are written
+in 1024-wide design units.
+
+**`pointer-events` are off on the layer and on again per control.** `#chrome` is
+`pointer-events:none` so a drag anywhere still reaches the rig; only `#chrome a`
+turns them back on. Without that the nav bar's own background would have eaten
+every drag across the top of the scene.
+
+**The accent token moved.** The design's green is a yellower lime than §2's
+emerald, so `--accent` went `#19e65a` → `#8ce03c`. Everything that referenced
+the token — preloader ring, scrollbar thumb — followed with it, which is the
+point of having had it as a token. Three new neutrals joined it: `--ink` for the
+headline white, `--line` for the hairline borders and `--mut` for the dim
+instrument text.
+
+Structure is semantic rather than a pile of divs: `<header>` as the banner,
+`<nav aria-label="Primary">`, a real `<h1>`, and the coordinate readout as a
+`<dl>`. The decorative marks — the plus ticks, the dotted rail, the mouse
+outline — are CSS pseudo-elements, so there are no icon assets to ship. Both
+animations (the scroll wheel, the status pulse) are dropped under
+`prefers-reduced-motion`.
+
+**Verified structurally, not visually.** The Browser pane here does not
+composite, so a DOM overlay cannot be screenshotted — the QA capture path only
+reads the WebGL canvas. What was checked: the accessibility tree carries every
+element with the right roles and text; computed `--accent` resolves to `#8ce03c`;
+every block's bounding box lands where intended; `#chrome` computes to
+`pointer-events:none`; there is no horizontal overflow and `scrollHeight` still
+equals the viewport height. The composed appearance is unverified and wants an
+eye on it.
+
+**The headline font is a system stack**, `Bahnschrift / DIN Alternate /
+Segoe UI Semibold / Impact`. The design's face is a squarer techno display font;
+matching it properly means a webfont, and the build currently fetches nothing but
+three from a CDN. Worth adding if the exact face matters.
