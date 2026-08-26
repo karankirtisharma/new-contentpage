@@ -66,29 +66,35 @@ const SCROLL_SPIN     = 0.0016; /* radians of rig.rotation.y per scrolled design
    ORBIT_XZ with ORBIT_RISE of height relative to the target, so this is the
    angle the intro dolly lands on and the angle the orbit is now locked to.
    Retuning ORBIT_RISE or ORBIT_XZ moves the lock with it. */
-/* FRAMING — fitted to the design frame.
+/* FRAMING — the canopy is cut in half by the top of the frame.
 
    Two knobs. FRAME_DROP moves the orbit centre — target AND camera together, so
    the view direction never changes — which slides the whole scene vertically in
    frame. CAMERA_FOV sets how much of it the frame holds.
 
-   Both were fitted against the design rather than chosen, by sweeping the pair
-   and scoring each against three numbers read off it: the rig's top edge at
-   9.3% down the frame, its bottom at 83.0%, and its width at 64.6% of the frame.
+   CAMERA_FOV 37 was fitted against the design by sweeping it with FRAME_DROP
+   and scoring each pair on the rig's width in frame; 37 lands it at 0.646
+   against the design's 0.646.
 
-     fov 34, drop  0.18   top 0.000 (cut off)  bottom 0.753  width 0.705
-     fov 34, drop  0.00   top 0.000 (cut off)  bottom 0.839  width 0.706
-     fov 40, drop -0.05   top 0.099            bottom 0.804  width 0.593
-     fov 37, drop -0.10   top 0.096            bottom 0.853  width 0.646   <- shipped
+   FRAME_DROP is then set by a different rule, and it is the one that matters
+   here: the canopy disc should be HALVED by the top edge, so only its lower
+   half is in shot. The disc's rim is a circle, so projecting it and taking the
+   midpoint between its nearest and furthest edge gives the line that has to sit
+   at the top of the frame. Solved by sweep — the midpoint's position as a
+   fraction down the frame, 0 being the top edge:
 
-   FRAME_DROP is NEGATIVE now. It was +0.18, which lifted the scene far enough
-   that the canopy left the top of the frame entirely — the design shows the
-   whole disc with air above it, so the orbit centre has to sit ABOVE the
-   machine's centre rather than below it, and the sign flips.
+     drop -0.10   mid  0.147   whole disc in shot, air above it
+     drop  0.00   mid  0.093
+     drop  0.10   mid  0.038
+     drop  0.17   mid  0.000   <- shipped: exactly half above the edge
+     drop  0.20   mid -0.016   more than half gone
+
+   At 0.17 the visible lower half of the disc reaches 25.6% down the frame and
+   the machine's bottom sits at 73.5%, which leaves the headline block its room.
 
    #scene3d is a fixed 1024x629 box that chrome.js only scales, so the aspect is
    1.628 on every device and this framing is identical everywhere. */
-const FRAME_DROP      = -0.10;  /* negative: orbit centre ABOVE the machine's centre */
+const FRAME_DROP      = 0.17;   /* puts the canopy's midline on the top edge */
 const CAMERA_FOV      = 37;     /* fitted to the design frame; see FRAMING */
 
 /* Unaffected by FRAME_DROP: both are built from ORBIT_XZ and ORBIT_RISE, which

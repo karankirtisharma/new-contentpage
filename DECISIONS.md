@@ -1349,3 +1349,33 @@ four quarter-turns and 1.54% at the fourth, against 26% before.
 ACES is kept, but for what it actually does: rolling off the overshoot that is
 left. It was checked earlier and it does **not** affect saturation — 0.435
 against NoToneMapping's 0.438.
+
+## 11.2 · The canopy is halved by the top edge
+
+Asked to hide the upper half of the canopy disc above the viewport's top edge.
+
+The rim is a circle, so projecting it and taking the midpoint between its nearest
+and furthest projected edge gives the line that has to land on the frame top.
+`FRAME_DROP` was solved by sweep against that midpoint, measured as a fraction
+down the frame with 0 being the top edge:
+
+| `FRAME_DROP` | disc midline |
+|---|---|
+| -0.10 | 0.147 — whole disc in shot, air above it |
+| 0.00 | 0.093 |
+| 0.10 | 0.038 |
+| **0.17** | **0.000** — exactly half above the edge |
+| 0.20 | -0.016 — more than half gone |
+
+The sign flipped back to positive: -0.10 had been set to bring the whole disc
+into frame, and this is the opposite requirement.
+
+Shipped and verified at all four quarter-turns: midline 0.000 at every one — it
+is a disc, so this is rotationally invariant and should be — visible lower half
+reaching 25.6% down the frame, machine's bottom at 72.1-73.6%, which leaves the
+headline block its room. Blown highlights unchanged at 0.09-1.59%.
+
+`CAMERA_FOV` stays 37, still fitted to the design's rig width (0.646 against
+0.646). The polar lock and the orbit radius are untouched — `FRAME_DROP` moves
+the orbit centre, and `ORBIT_POLAR`/`ORBIT_RADIUS` are built from offsets
+relative to that centre.
