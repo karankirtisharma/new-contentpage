@@ -10,11 +10,7 @@
   'use strict';
 
   /* ---------------- 1024 design canvas ---------------- */
-  /* #scene3d is top:-5 height:629 -> 624; #scene3d2 sits at top:624 with the
-     same height, and #scene3d3 follows it at top:1253. Getting this wrong
-     does not clip anything — it sets the scrolled height of <body>, so too small
-     and the lower sections cannot be scrolled to. */
-  var PAGE_H = 624 + 629 + 629;
+  var PAGE_H = 624;                       /* #scene3d top:-5 + height:629 */
   var COARSE = matchMedia('(pointer: coarse)').matches;
   var IS_SAFARI = /^((?!chrome|crios|crmo|android).)*safari/i.test(navigator.userAgent) && !COARSE;
   var USE_TRANSFORM = IS_SAFARI || COARSE;

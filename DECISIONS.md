@@ -1008,161 +1008,27 @@ and bottom at 73.3-74.6%. Everything from §7.11 to §7.16 is untouched — the
 white studio lighting, the material remap, the screen gain of 0.70, the top crop
 of 0.14, the height lock and the FOV fit all still stand.
 
-# 8 · Section 2 — the holographic tree
+# 8 · Sections 2 and 3, added and removed
 
-## 8.1 · The asset, and why the pipeline needed no changes
+A holographic-tree section and a neon-screen-display section were built on top
+of the hero and then removed at request. `js/tree.js`, `js/neon.js`,
+`assets-final/holographic-tree.glb` and `assets-final/neon-screens.glb` are
+deleted, along with both raw sources; `index.html`, `css/hero.css` and
+`js/chrome.js` are back to serving the hero alone, with `PAGE_H` returned to
+624 so the body is once again exactly the hero's height — which puts the hero's
+`SCROLL_SPIN` back to being dormant, as it was before §8 existed.
 
-`holographic tree 3d model.glb`, 55.3 MB, is the same kind of thing as the rig:
-a Tripo export with one node, one mesh, one material and three 4096² maps.
-Measured before anything was built, because it decided how much of §7 carried
-over:
+Two things from that work are kept deliberately, because neither is
+section-specific:
 
-| | rig | tree |
-|---|---|---|
-| triangles | 1,872,694 | 1,958,058 |
-| wire size | 57.4 MB | 55.3 MB |
-| MR metalness, mean / median | 0.876 / 0.961 | **0.913 / 0.965** |
-| MR roughness, mean / median | 0.068 / 0.020 | **0.053 / 0.004** |
-| basecolor mean sRGB | 0.19, 0.31, 0.09 | **0.026, 0.143, 0.024** |
-
-The same degenerate near-mirror MR map, so the same remap (§7.11) applies
-unchanged. The basecolor is darker still — value 0.144 against the rig's 0.31 —
-which is the whole reason the lighting here is not a copy of the hero's.
-
-**Compressed with the existing two-step pipeline, no edits.** Both scripts were
-already parameterised on paths and settings, so the rig's numbers ran straight
-through: textures 4096² → 2048/2048/1024, geometry ratio 0.08 at error 0.01.
-1,958,058 → 156,640 triangles (8.0% kept), **55.3 MB → 1.83 MB**, against the
-rig's 2.37 MB.
-
-The toolchain itself was gone — no `package.json`, no `node_modules` — so the
-deps are now pinned in a dev-only `package.json` and both directories are
-git-ignored. Nothing in it ships; the site is still static.
-
-## 8.2 · Two things the rig's approach could not carry over
-
-**It is a relief, not an object in the round.** Bounding box 0.980 x 0.721 x
-0.450 — the depth is under half the width. So there is no orbit in this section;
-a 16-second sway of ±0.10 rad, which never turns far enough to show how flat it
-is.
-
-**It has no flat display faces.** The rig's screens were geometry cut from four
-clean 0.78 x 0.63 panels. On the tree the largest coplanar clusters after the
-top and bottom caps are ~0.001 in area — fragments. The pods' holographic
-content is painted into the basecolor, not modelled.
-
-Automatic pod-finding was tried and abandoned on evidence: bin every
-front-facing triangle into an 80x80 grid over the model's XY and peak-find. It
-does find the pods, but also the glass shells around them and the branch
-junctions between them, and no suppression radius separated four cleanly — at
-radius 7 one pod returned as four peaks, at radius 16 it merged its neighbours.
-Curved shells do not cluster the way a flat panel does. So the four planes are
-placed, in bounding-box fractions rather than model units so a rescale cannot
-drag them off, and checked against renders.
-
-Two things made them read as part of the pod rather than stuck over it:
-a per-pod X tilt onto the dish's own plane, and an elliptical alpha mask in the
-screen shader — the dishes are round and a rectangular video inside one reads
-as a sticker.
-
-## 8.3 · Lighting, and one arithmetic bug worth recording
-
-**Ambient is 0.35, against the hero's 1.4.** The first pass ran it at 1.8 and
-the tree came back a flat mid-green with the glow gone. This basecolor is almost
-entirely dark with thin bright filaments; lifting the floor lifts the dark far
-more than the filaments, which already sit near the top of the range. Keeping
-the floor down is what lets the bright lines read as bright.
-
-**The fit formula cancelled itself.** `dist = size.y * FIT / (2*tan(fov/2))`
-followed by `camera.z = dist / FIT` is just `size.y / (2*tan(fov/2))` — a fit of
-exactly 1.0, so the tree filled the frame with the trunk cut off at both ends
-and `FIT_HEIGHT` appeared to do nothing. Correct form is
-`size.y / (2 * FIT * tan(fov/2))`.
-
-## 8.4 · Wiring
-
-`#scene3d2` sits at `top: 624px` in the same 1024px design canvas, so
-`chrome.js` PAGE_H went 624 → 624 + 629. That makes the page scrollable for the
-first time, which in turn **activates the hero's `SCROLL_SPIN`** — it has been
-in the code since §7 but dormant because the body was exactly the hero's height.
-
-Its own WebGL context, sharing no state with the hero, and each section's loop
-is gated on an IntersectionObserver so only the visible one draws.
-
-Video is a shuffle taken fresh on every load, over a pool of the four stock
-clips **and** the four local loops — four URLs across four pods would only ever
-permute the same four. Every pool entry is known to load: two further Pexels
-ids were tried and both answered 403, which the per-element fallback swallowed
-silently while still costing a failed request on each load. Each element still
-falls back to a local loop, so the section never goes dark offline.
-
-# 9 · Section 3 — the neon screen display
-
-## 9.1 · The asset
-
-Third Tripo export in the set, and it ran through the same pipeline at the same
-settings with no edits: **52.6 MB → 1.97 MB**, 1,824,519 → 145,960 triangles
-(8.0% kept).
-
-Measured before building, because it is the first of the three whose numbers
-differ enough to change the treatment:
-
-| | rig | tree | neon |
-|---|---|---|---|
-| MR metalness median | 0.961 | 0.965 | **0.769** |
-| MR roughness median | 0.020 | 0.004 | **0.067** |
-| basecolor mean sRGB | .19/.31/.09 | .026/.143/.024 | .074/.151/.043 |
-| bbox | — | 0.980 x 0.721 x 0.450 | 0.983 x 0.486 x 0.984 |
-
-Milder mirror than the other two, so `METALNESS_SCALE` is 0.25 here against
-their 0.15. The roughness lift is unchanged — 0.067 is still a mirror.
-
-## 9.2 · The screens are real geometry, and that changes the approach
-
-The tree needed its video planes placed by hand because it had no flat faces.
-This one is the opposite. Clustering every triangle by normal and plane offset
-over the source turns up six large coplanar faces, all at y ~0.18 on a circle of
-radius ~0.42, areas 0.0361-0.0380 — the panels. So the video is **cut from the
-mesh**, the way the hero's screens are: the footage cannot sit crooked and
-cannot spill past a bezel, because the geometry *is* the face.
-
-**The outward test is the part that matters.** Every panel has a twin face about
-0.09 behind it, facing inward, of almost the same area (0.0334, 0.0332). Taking
-the six largest clusters happens to return the six front faces on this asset,
-and that would be luck — a slightly different simplification ratio could flip a
-pair. The filter requires `dot(normal, centroidXZ) > 0` instead, which is a
-property of what a display face *is* rather than of this particular export.
-
-Extracted at runtime: 6 faces, 0.468-0.570 x 0.325-0.331 each. The consistent
-height across all six against varying triangle counts (89 to 536) is the sign
-the clustering found whole faces rather than fragments.
-
-Cover-fit and the 14% top crop are carried over from §7.14 unchanged — the clip
-with the baked-in bright header is in this pool too.
-
-## 9.3 · Two framing corrections
-
-**The fit was measured against the wrong thing.** `FIT_WIDTH` frames the stage's
-centre, but the stage's near edge sits 0.49 closer to the camera, so at 0.92 the
-near rim rendered half again as large as the fit assumed and spilled off the
-bottom of the frame while the canopy left the top. 0.72 leaves the near edge
-room to be nearer.
-
-**The floor was brighter than the screens.** Two causes, both from the same
-fact: this model is mostly a pair of wide discs facing straight up. A key with
-much elevation lands square on them, and an up-facing surface reflects the
-environment's *upper* hemisphere across its whole area. So the key and rim were
-dropped to grazing elevations (1.8 → 0.85, 1.6 → 0.9), `ENV_INTENSITY` went
-1.1 → 0.55 and the env's sky from `0xc2ccd4` to `0x7c848c`. The panels barely
-notice — they are vertical and take their light from the key.
-
-## 9.4 · Wiring
-
-`#scene3d3` at `top: 1253px`, chrome.js PAGE_H 624+629 → 624+629+629. Its own
-WebGL context, gated on an IntersectionObserver like the other two, so at most
-one section is drawing at a time. The stage turns slowly (0.4 rpm) rather than
-sitting still, which is what brings all six panels round — unlike the tree,
-this model *is* in the round.
-
-Six screens draw from the same shuffled stock-plus-local pool. With six to fill
-and only four stock URLs, the local loops in the pool are doing real work here.
+- **`package.json`.** The asset pipeline had no manifest at all — the deps had
+  been installed ad hoc and were gone by the time they were needed again. They
+  are now pinned, with `node_modules/` and `package-lock.json` git-ignored.
+  Nothing in it ships; it is what `qa/step1-textures.mjs` and
+  `qa/step2-geometry.mjs` need in order to rebuild `hero-rig.glb`.
+- **The measured settings.** Both models ran through that pipeline unchanged at
+  the rig's own numbers — textures 4096² → 2048/2048/1024, geometry ratio 0.08
+  at error 0.01 — and both landed where the rig did: 55.3 MB → 1.83 MB and
+  52.6 MB → 1.97 MB, each keeping 8.0% of its triangles. Three Tripo exports of
+  ~1.9M triangles have now taken those settings without retuning, which is worth
+  knowing before anyone reaches for the knobs on a fourth.

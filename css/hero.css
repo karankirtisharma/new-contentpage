@@ -37,29 +37,13 @@ body{
   opacity:0;transition:opacity .4s ease;
   cursor:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='128' height='34'><path d='M15 2v26M2 15h26' stroke='white' stroke-width='2.2'/><text x='34' y='9' fill='%23999999' font-family='monospace' font-size='9' letter-spacing='0.5'>ROTATE 3D</text></svg>") 15 15, crosshair}
 body.chrome-in #scene3d canvas{opacity:1}
-
-/* ---- section 2: the holographic tree ----
-   Stacked directly under the hero in the same design canvas. `top` is the hero's
-   PAGE_H from chrome.js; the two must move together, so chrome.js now derives
-   its page height from this block's bottom edge rather than the hero's. */
-#scene3d2{position:absolute;left:0;top:624px;width:1024px;height:629px;z-index:4}
-#scene3d2 canvas{display:block;width:100%!important;height:100%!important;
-  opacity:0;transition:opacity .4s ease}
-body.tree-in #scene3d2 canvas{opacity:1}
-
-/* ---- section 3: the neon screen display ---- */
-#scene3d3{position:absolute;left:0;top:1253px;width:1024px;height:629px;z-index:4}
-#scene3d3 canvas{display:block;width:100%!important;height:100%!important;
-  opacity:0;transition:opacity .4s ease}
-body.neon-in #scene3d3 canvas{opacity:1}
-
-#preloader,#preloader2,#preloader3{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+#preloader{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   transform:translateY(-100px);z-index:3;pointer-events:none}
-#preloader .ring,#preloader2 .ring,#preloader3 .ring{width:80px;height:80px;border:1px solid var(--accent-deep);border-top-color:var(--accent);
+#preloader .ring{width:80px;height:80px;border:1px solid var(--accent-deep);border-top-color:var(--accent);
   border-radius:50%;animation:preSpin 1s linear infinite}
 @keyframes preSpin{to{transform:rotate(360deg)}}
 
 @media (prefers-reduced-motion:reduce){
-  #preloader .ring,#preloader2 .ring,#preloader3 .ring{animation:none}
-  #scene3d canvas,#scene3d2 canvas{transition:none}
+  #preloader .ring{animation:none}
+  #scene3d canvas{transition:none}
 }
