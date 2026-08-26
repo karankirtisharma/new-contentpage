@@ -1032,3 +1032,56 @@ section-specific:
   52.6 MB → 1.97 MB, each keeping 8.0% of its triangles. Three Tripo exports of
   ~1.9M triangles have now taken those settings without retuning, which is worth
   knowing before anyone reaches for the knobs on a fourth.
+
+# 9 · Lighting matched to the default model viewer
+
+Given a reference frame of the rig as a default model viewer renders it, and
+asked to use that lighting.
+
+**The difference was the shape of the environment, not its brightness.** §7.11
+replaced a green light rig with a white one and built the environment by hand:
+a sphere carrying a three-stop vertical gradient, plus a bright card at the
+mount. That is the wrong kind of thing for a near-mirror to reflect. A gradient
+has no features, so a polished surface returns a smooth wash and reads as tinted
+plastic. `RoomEnvironment` — the neutral studio that model-viewer, gltf-viewer
+and three's own examples use — is a little room with actual light panels in it,
+so the same surface returns *edges*, and edges are what make it read as glass.
+The asset has looked like glass in every viewer except this one for exactly that
+reason. It is a three addon, generated at runtime: no asset, no fetch, PMREM
+disposed immediately.
+
+**The spot is deleted.** It was a 26-then-9 intensity cone at the mount, there
+to be the machine's key and to motivate the pool drawn on the ceiling. With the
+environment lighting the model properly it had no work left except to put a
+hotspot on the canopy — which is the artefact this whole thread opened with. The
+ceiling's pool and the light shaft are drawn in their own shaders and never
+depended on it.
+
+**Ambient went 1.4 → 2.4, and that is what actually fixed the canopy.** A disc
+that wide facing DOWN takes almost nothing from a key above it and nothing from
+a rim behind it. In the reference its underside is a lit olive-green; ambient
+and the environment are the only things that can put light there.
+
+| | before | after |
+|---|---|---|
+| environment | hand-built gradient shell + key card | `RoomEnvironment` |
+| env intensity | 1.6 | 5.0 |
+| ambient | 1.4 | 2.4 |
+| spot | 9, at the mount | **removed** |
+| key / fill / rim | 3.6 / 1.2 / 1.5 | 2.4 / 1.0 / 1.2 |
+| exposure | 1.0 | 1.3 |
+| grade contrast | 1.06 | 1.0 |
+| grade vignette | 0.42 | 0.12 |
+
+`ENV_INTENSITY` is 5.0 rather than the 1.0 a viewer would use because this is
+not a viewer: it renders through ACES plus a contrast curve and a vignette, and
+it sits on a near-black page rather than a viewer's grey room. Matched by eye
+against the reference rather than assumed.
+
+**The vignette was the last thing in the way.** The canopy spans the top corners
+of the frame, which is exactly where a vignette bites hardest, and at 0.42 it
+was pulling the underside back to near-black *after* the lighting had just lit
+it. Confirmed by rendering the same frame with it on and off before changing it.
+
+Nothing else moved: FOV 34, the orbit height lock and the material remap are all
+as they were.

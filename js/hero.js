@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -147,65 +148,47 @@ renderer.setSize(container.clientWidth, container.clientHeight);
    so the §2 palette lands exactly where it did before. */
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;    /* 0.95 -> 1.0 with the white studio; the model's albedo is dark green and needs it */
+renderer.toneMappingExposure = 1.3;    /* raised again to meet the reference frame's brightness */
 container.appendChild(renderer.domElement);
 
 /* ---------------------------------------------------------------- LIGHTS
-   Torn down and rebuilt as a plain white studio.
+   Matched to how the asset renders in a default model viewer, which is the look
+   it was authored against. That look is image-based: a neutral studio
+   environment does nearly all of the work (see ENVIRONMENT) and the punctual
+   lights only shape it.
 
-   What was here before was a *look*: a 26-intensity spot jammed against the
-   mount with decay 2, a rim and a fill, each on its own tint, sculpting the
-   machine into something the asset was never authored to be. Combined with a
-   near-mirror material (see MATERIAL below) it produced the blown green
-   highlights down the spine — light that was being performed at the model
-   rather than falling on it.
+   So the rig here is smaller than it was. Every light is still pure white —
+   nothing tints, the hue in the frame is the GLB's own basecolor and only that.
 
-   Every light is now pure white and there is no styling left in the rig at
-   all: a soft overhead from the fixture the machine hangs from, a 3/4 key, a
-   weaker fill opposite it, and a back light for the silhouette. Classic
-   three-point plus a practical. Nothing tints, nothing sculpts — the hue in
-   the frame is the GLB's own basecolor and only that.
+   THE SPOT IS GONE. It was a 26-then-9 intensity cone at the mount, there to
+   motivate the pool drawn on the ceiling and to be the machine's key. With the
+   environment lighting the model properly it had no work left to do except put
+   a hotspot on the top of the canopy, which is the artefact this whole thread
+   started with. The ceiling's pool and the light shaft are drawn in their own
+   shaders and never depended on it.
 
-   Intensities are low on purpose. The material below is diffuse-dominant now,
-   so it actually *takes* light instead of only mirroring it, and the values
-   that used to be needed to make a mirror visible would blow a diffuse
-   surface flat white. */
+   Ambient carries the canopy. A disc that wide facing DOWN takes almost nothing
+   from a key above it and nothing from a rim behind it — in the reference frame
+   its underside is a lit olive-green, and ambient plus the environment is the
+   only thing that puts light there. */
 const LIGHT_WHITE = 0xffffff;     /* every light in the scene, no exceptions */
-const KEY_TINT    = LIGHT_WHITE;  /* the PMREM key card matches the practical */
+const KEY_TINT    = LIGHT_WHITE;
 
-/* base level — the shadow side is a shadow, not a hole */
-scene.add(new THREE.AmbientLight(LIGHT_WHITE, 1.4));
+scene.add(new THREE.AmbientLight(LIGHT_WHITE, 2.4));
 
-/* The practical: the ceiling fixture the machine is bolted to. Kept because it
-   is what motivates the pool drawn on the dome and the shaft under it — but
-   softened right down (26 -> 9, angle 0.62 -> 0.80, penumbra 0.82 -> 0.95,
-   decay 2 -> 1.5) so it reads as a room light spilling down the machine rather
-   than a hotspot burning a hole in the top of it. */
-const spotLight = new THREE.SpotLight(LIGHT_WHITE, 9);
-spotLight.position.set(0, CEILING_Y + 1.6, 0);
-spotLight.target.position.set(0, CEILING_Y - 2.4, 0);
-spotLight.angle = 0.80;
-spotLight.penumbra = 0.95;
-spotLight.decay = 1.5;            /* softer than inverse-square; the pool reaches the base */
-spotLight.distance = 13;
-scene.add(spotLight, spotLight.target);
-
-/* KEY — the light that actually shows the model its own colour. Front-left and
-   above, the standard 3/4 position; world-fixed, so the machine is modelled by
-   it differently at each point of the orbit instead of looking identical from
-   every angle. */
-const keyLight = new THREE.DirectionalLight(LIGHT_WHITE, 3.6);
+/* KEY — front-left and above, the standard 3/4 position. World-fixed, so the
+   machine is modelled by it differently at each point of the orbit. */
+const keyLight = new THREE.DirectionalLight(LIGHT_WHITE, 2.4);
 keyLight.position.set(-2.6, 2.2, -1.9);
 scene.add(keyLight);
 
-/* FILL — opposite the key, roughly a third of it, so the far side keeps its
-   form without the two cancelling into flat, even lighting */
-const fillLight = new THREE.DirectionalLight(LIGHT_WHITE, 1.2);
+/* FILL — opposite the key, so the far side keeps its form */
+const fillLight = new THREE.DirectionalLight(LIGHT_WHITE, 1.0);
 fillLight.position.set(2.8, 0.5, 1.6);
 scene.add(fillLight);
 
 /* BACK — grazing from behind and above, to lift the silhouette off the haze */
-const rimLight = new THREE.DirectionalLight(LIGHT_WHITE, 1.5);
+const rimLight = new THREE.DirectionalLight(LIGHT_WHITE, 1.2);
 rimLight.position.set(1.6, 1.9, 2.6);
 scene.add(rimLight);
 
@@ -262,69 +245,33 @@ scene.fog = new THREE.FogExp2(0x0e1013, FOG_DENSITY);   /* neutral grey, no hue 
 }
 
 /* -------------------------------------------------------- ENVIRONMENT
-   This is the single most important light in the scene and it is not a light.
-   The rig's own MR map samples at metalness 0.96 / roughness 0.02 (medians,
-   measured off the texture) — a full mirror over the entire model. That is why
-   an environment was needed at all: a mirror reflects its surroundings and
-   almost nothing else. The material is no longer left that way (see MATERIAL,
-   at the loader), so the env's job is now reflections and wrap-around fill
-   rather than being the light source of last resort.
+   RoomEnvironment — the same neutral studio that model-viewer, gltf-viewer and
+   three's own examples light a dropped-in GLB with. This is the "default model
+   lighting" the asset was authored against and is being matched to here.
 
-   The env is generated at runtime with PMREMGenerator from the same palette
-   and the same vertical gradient as the backdrop shell above, so what the
-   metal reflects and what sits behind it agree instead of looking pasted
-   together. Plus a mint key card at the mount, matching the spot, so the
-   reflections have a bright edge to run along rather than a flat wash.
-   No asset, no extra dependency.
+   It replaces a hand-built shell: a sphere carrying a three-stop vertical
+   gradient plus a bright card at the mount. That shell was the wrong shape of
+   thing for a near-mirror to reflect. A gradient has no features, so a polished
+   surface returns a smooth wash of grey-green and reads as tinted plastic;
+   RoomEnvironment is a little room with actual light panels in it, so the same
+   surface returns edges, and edges are what make it read as glass. The model
+   has looked like glass in every viewer except this one for exactly that
+   reason.
 
-   ENV_INTENSITY went 3.4 -> 1.6. It was tuned when the model was left as a
-   near-mirror, where the environment was doing nearly all of the lighting and
-   had to be pushed hard to make the metal visible at all. With the material
-   remapped to a real surface (see MATERIAL, at the loader) the env is back to
-   what it should be — reflections and soft wrap-around fill, not the primary
-   light. At 3.4 against a diffuse surface it washes the basecolor straight
-   out. */
-const ENV_INTENSITY = 1.6;
+   It is generated at runtime from three's own addon — no asset, no texture
+   fetch, and PMREM is disposed straight after. */
+/* 5.0, not the 1.0 a viewer would use, because this scene is not a viewer: it
+   renders through ACES plus a contrast curve and a vignette, and it sits on a
+   near-black page rather than the viewer's grey room. Matched by eye against
+   the reference frame rather than assumed. */
+const ENV_INTENSITY = 5.0;
 {
-  const envScene = new THREE.Scene();
-  const shell = new THREE.Mesh(
-    new THREE.SphereGeometry(12, 32, 24),
-    new THREE.ShaderMaterial({
-      side: THREE.BackSide,
-      /* Deliberately far brighter than the visible backdrop. This shell is never
-         drawn — it only feeds PMREM. A near-mirror reflects the environment and
-         almost nothing else, so if the env matches the dim background the metal
-         has nothing to return and goes black. A studio softbox is much brighter
-         than the wall behind the subject; same idea. */
-      uniforms: { uDeep: { value: new THREE.Color(0x24282c) },
-                  uHaze: { value: new THREE.Color(0xc2ccd4) },
-                  uCool: { value: new THREE.Color(0x4a5158) } },
-      vertexShader: `varying vec3 vP;
-        void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: `uniform vec3 uDeep; uniform vec3 uHaze; uniform vec3 uCool; varying vec3 vP;
-        void main(){
-          /* same vertical structure as the backdrop. Neutral throughout: this
-             is what the metal reflects, so any hue here would come straight
-             back as a tinted highlight and kill the glass read. */
-          float up = smoothstep(-0.85, 0.85, vP.y);
-          vec3 c = mix(mix(uCool, uDeep, smoothstep(-1.0, -0.1, vP.y)), uHaze * 0.62, up);
-          gl_FragColor = vec4(c, 1.0);
-        }`
-    })
-  );
-  envScene.add(shell);
-  /* key card at the mount, matching the spot — gives the mirror an edge to catch */
-  const key = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4),
-    new THREE.MeshBasicMaterial({ color: KEY_TINT }));
-  key.position.set(0, CEILING_Y + 0.4, 0);
-  key.rotation.x = Math.PI / 2;
-  envScene.add(key);
-
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(envScene, 0.035).texture;
+  pmrem.compileEquirectangularShader();
+  const room = new RoomEnvironment();
+  scene.environment = pmrem.fromScene(room, 0.04).texture;
+  room.dispose();
   pmrem.dispose();
-  shell.geometry.dispose(); shell.material.dispose();
-  key.geometry.dispose(); key.material.dispose();
 }
 
 /* ------------------------------------------------------------- CEILING
@@ -979,9 +926,12 @@ composer.addPass(filmPass);
    frame that is now meant to be neutral except for the model. */
 const GRADE_SHADOW   = new THREE.Color(0xa9b6c4);  /* a whisper cool in the darks */
 const GRADE_HIGH     = new THREE.Color(0xffffff);  /* highlights stay white       */
-const GRADE_CONTRAST = 1.06;
+const GRADE_CONTRAST = 1.0;    /* off — the environment now supplies the tonal range */
 const GRADE_PIVOT    = 0.16;   /* low pivot was crushing the grey backdrop to black */
-const GRADE_VIGNETTE = 0.42;
+/* 0.42 -> 0.12. The canopy spans the top corners of the frame, which is exactly
+   where a vignette bites hardest, and at 0.42 it was pulling the underside back
+   to near-black after the lighting had just lit it. */
+const GRADE_VIGNETTE = 0.12;
 const gradePass = new ShaderPass({
   uniforms: {
     tDiffuse: { value: null },
@@ -1128,7 +1078,8 @@ if (TUNE) {
   window.__bloom = bloomPass;
   window.__grade = gradePass;
   window.__screenGain = SCREEN_GAIN;
-  window.__spot = spotLight;
-  window.__rim = rimLight;
+  window.__lights = { key: keyLight, fill: fillLight, rim: rimLight };
+  window.__mats = [];
+  scene.traverse(o => { if (o.isMesh && o.material && o.material.isMeshStandardMaterial) window.__mats.push(o.material); });
   console.log('[tune] on — __screens/__rig/__rigBody/__cam/__controls/__renderer/__film/__bloom');
 }
