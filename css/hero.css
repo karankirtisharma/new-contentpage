@@ -5,15 +5,16 @@
    scroll cue and a status corner. It all sits inside #page, so chrome.js
    scales the composition as one piece and the layout holds at any width.
 
-   The accent moved with it. The old token was #19e65a, an emerald; the
-   design's green is a yellower lime, so it is now #8ce03c and everything that
-   referenced the token — preloader ring, scrollbar — follows automatically.
+   The accent is the project's original §2 emerald, #19e65a. It was briefly
+   swapped for a yellower lime read off the design mockup and then put back.
+   Everything that references the token — headline accent, marks, preloader
+   ring, scrollbar — follows from that one line.
    ===================================================================== */
 
 :root{
-  /* ---- green token system: the only accent hue in the viewport ---- */
-  --accent:#8ce03c;        /* signal: headline accent, marks, ring, scrollbar */
-  --accent-deep:#3f6b1c;   /* deep accent: preloader track                    */
+  /* ---- §2 green token system: the only accent hue in the viewport ---- */
+  --accent:#19e65a;        /* signal: headline accent, marks, ring, scrollbar */
+  --accent-deep:#145c2e;   /* deep accent: preloader track                    */
   --stage:#000;
   --grey:#818181;
   --ink:#e8e8e8;           /* headline white                                  */

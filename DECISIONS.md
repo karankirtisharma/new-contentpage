@@ -1267,10 +1267,12 @@ in 1024-wide design units.
 turns them back on. Without that the nav bar's own background would have eaten
 every drag across the top of the scene.
 
-**The accent token moved.** The design's green is a yellower lime than §2's
-emerald, so `--accent` went `#19e65a` → `#8ce03c`. Everything that referenced
-the token — preloader ring, scrollbar thumb — followed with it, which is the
-point of having had it as a token. Three new neutrals joined it: `--ink` for the
+**The accent stayed §2's emerald, `#19e65a`.** It was briefly swapped to
+`#8ce03c`, a yellower lime read off the design mockup, and then put back to the
+colour the project shipped with. Both swaps were one line each, which is the
+point of having had it as a token — the headline accent, the marks, the
+preloader ring and the scrollbar thumb all followed automatically, in both
+directions. Three new neutrals joined it: `--ink` for the
 headline white, `--line` for the hairline borders and `--mut` for the dim
 instrument text.
 
