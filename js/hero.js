@@ -12,7 +12,6 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { FilmPass } from 'three/addons/postprocessing/FilmPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
@@ -260,11 +259,20 @@ scene.fog = new THREE.FogExp2(0x0e1013, FOG_DENSITY);   /* neutral grey, no hue 
 
    It is generated at runtime from three's own addon — no asset, no texture
    fetch, and PMREM is disposed straight after. */
-/* 9.0, not the 1.0 a viewer would use, because this scene is not a viewer: it
-   renders through ACES plus a contrast curve and a vignette, and it sits on a
-   near-black page rather than the viewer's grey room. Measured against the
-   reference rather than guessed — see GRADE_SATURATION for the numbers. */
-const ENV_INTENSITY = 9.0;
+/* With the material left as authored this is the ONLY thing lighting the model,
+   so it carries the whole look. A metal has no diffuse response, so the ambient
+   and the three directional lights below contribute almost nothing to it — they
+   matter only where the metalness map dips (its 10th percentile is 0.573, so
+   parts of the machine are partly dielectric).
+
+   8.0 rather than the 1.0 a viewer would use, because a viewer puts the model in
+   a lit grey room and this puts it on a black stage: a mirror can only show what
+   is around it, and here there is very little. Even so it saturates quickly —
+   4 -> 20 moves the spine only from RGB 50,71,37 to 63,87,48 while the clipped
+   fraction climbs from 11.7% to 17.4%. That is what a mirror does: it is either
+   reflecting a light panel, and blown, or reflecting the dark, and black. 8 is
+   where it reads without throwing more away. */
+const ENV_INTENSITY = 8.0;
 {
   const pmrem = new THREE.PMREMGenerator(renderer);
   pmrem.compileEquirectangularShader();
@@ -696,28 +704,16 @@ new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
     ORBIT_Y = rigBody.position.y;                /* == the model's centre, the new orbit centre */
 
     /* ------------------------------------------------------------ MATERIAL
-       The basecolor map is the model's design. Nothing here tints it, adds to
-       it or glows it — the one thing that happens is that the surface is made
-       able to SHOW it.
+       Nothing is done to it. The GLB's own basecolor, normal and
+       metallic-roughness maps are used exactly as authored — no remap, no
+       tint, no emissive, no accent multiply.
 
-       Why that is needed: the asset is a Tripo bake, and its metallic-roughness
-       map is degenerate. Measured over the whole 1024² texture, metalness is
-       0.876 mean / 0.961 median and roughness 0.068 mean / 0.020 median — one
-       flat near-perfect mirror across every part of the machine, panels, cables
-       and hub alike. A metal surface has no diffuse response at all, so under
-       ANY light a metalness-0.96 surface returns the environment, not its own
-       colour, tinted by the basecolor at grazing incidence only. That is the
-       blown, wet, hotspot-down-the-spine read — it was never lighting alone.
-
-       So the map is kept, for its variation, and remapped: metalness scaled
-       down to a faint sheen and roughness lifted out of mirror territory into a
-       satin band. Same texture, same detail, but the basecolor is now what the
-       white lights land on and come back from. Nothing else about the PBR is
-       touched — no emissive, no tint, no accent multiply. */
-    const METALNESS_SCALE = 0.15;   /* 0.96 map median -> 0.14: sheen, not chrome */
-    const ROUGH_FLOOR     = 0.42;   /* what a map value of 0 becomes */
-    const ROUGH_CEIL      = 0.90;   /* what a map value of 1 becomes */
-
+       This reverses the remap that used to live here, which scaled metalness to
+       0.15 and lifted roughness into a 0.42-0.90 band. That was there because
+       the map is a near-mirror (metalness 0.961 median, roughness 0.020) and a
+       mirror shows its environment rather than its own colour — but the fix for
+       that is to give it an environment worth reflecting, which RoomEnvironment
+       now does, not to rewrite the material the asset shipped with. */
     const maxAniso = renderer.capabilities.getMaxAnisotropy();
     let glbMesh = null;
     model.traverse(o => {
@@ -726,16 +722,6 @@ new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
       /* The remap. Both chunks define their factor as `scalar * map channel`,
          so appending after the include rewrites the sampled value itself and
          the texture's variation survives the transform. */
-      o.material.onBeforeCompile = shader => {
-        shader.fragmentShader = shader.fragmentShader
-          .replace('#include <roughnessmap_fragment>',
-            `#include <roughnessmap_fragment>
-             roughnessFactor = mix(${ROUGH_FLOOR.toFixed(2)}, ${ROUGH_CEIL.toFixed(2)}, roughnessFactor);`)
-          .replace('#include <metalnessmap_fragment>',
-            `#include <metalnessmap_fragment>
-             metalnessFactor *= ${METALNESS_SCALE.toFixed(2)};`);
-      };
-      o.material.customProgramCacheKey = () => 'rig-mr-remap';
       o.material.needsUpdate = true;
       for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap']) {
         if (o.material[k]) { o.material[k].anisotropy = maxAniso; o.material[k].needsUpdate = true; }
@@ -900,12 +886,9 @@ composer.addPass(new RenderPass(scene, camera));
    smeared; at 0.85 the machine went black. 0.72 blooms the highlights only, so
    edges stay edges and screen text stays readable. Its buffer is sized in
    device pixels to match the real pixel ratio. */
-const bloomPass = new UnrealBloomPass(
-  new THREE.Vector2(container.clientWidth * heroPixelRatio(), container.clientHeight * heroPixelRatio()),
-  0.20,   /* strength  — was 0.45 */
-  0.14,   /* radius    — tight so it never softens an edge */
-  0.90);  /* threshold — only the specular hotspots bloom, nothing else */
-composer.addPass(bloomPass);
+/* No bloom. It was the last thing in the frame adding light that the model does
+   not itself emit — a glow around every specular hotspot. The pass is not added
+   at all rather than run at strength 0, so its blur chain costs nothing. */
 /* Grain kept at a whisper, scanlines off entirely (they were the crawl). Set
    FILM_STRENGTH to 0 to drop the pass's contribution completely. */
 const FILM_STRENGTH = 0.06;   /* was 0.10 — grain is not where the mood comes from */
@@ -922,34 +905,22 @@ composer.addPass(filmPass);
        near-black without crushing the screens.
      - a vignette, to stop the corners competing with the centre.
    GRADE_* below are the only knobs; none of them soften an edge. */
-/* Near-neutral. The old teal/mint split-tone was re-introducing hue into a
-   frame that is now meant to be neutral except for the model. */
-const GRADE_SHADOW   = new THREE.Color(0xa9b6c4);  /* a whisper cool in the darks */
-const GRADE_HIGH     = new THREE.Color(0xffffff);  /* highlights stay white       */
+/* The split-tone is gone. It multiplied a cool tint into the darks, which is
+   colour the model does not have — the frame carries the GLB's own hue and
+   nothing else now. The two colours stay only because the pass's uniforms are
+   still declared against them; neither is read. */
+const GRADE_SHADOW   = new THREE.Color(0xffffff);
+const GRADE_HIGH     = new THREE.Color(0xffffff);
 const GRADE_CONTRAST = 1.0;    /* off — the environment now supplies the tonal range */
 const GRADE_PIVOT    = 0.16;   /* low pivot was crushing the grey backdrop to black */
 /* 0.42 -> 0.12. The canopy spans the top corners of the frame, which is exactly
    where a vignette bites hardest, and at 0.42 it was pulling the underside back
    to near-black after the lighting had just lit it. */
 const GRADE_VIGNETTE = 0.12;
-/* Saturation, applied last. Brightness alone could not reach the reference
-   green: the environment is neutral, so every unit of it that lifts the model
-   also pushes the colour toward white. Measured on the spine, average RGB and
-   saturation of the lit pixels:
-
-     env 5,  no sat        58, 91, 36   sat 0.667   <- was shipping
-     env 5,  sat 1.4       48, 94, 21   sat 0.844   vivid but no brighter
-     env 12, no sat        76,129, 41   sat 0.743   brighter but washing out
-     env 12, sat 1.5       72,130, 36   sat 0.783   the reference's colour, but
-                                                    env 12 blows the flat panel
-                                                    backs to solid white
-     env 9,  sat 1.45      the same colour, nothing blown  <- shipped
-
-   So the two work together: the environment supplies the brightness and this
-   puts back the saturation it costs. The ceiling on the environment is set by
-   the model's flat glossy panels, not by the spine — at 12 they go white before
-   the spine is anywhere near clipping. */
-const GRADE_SATURATION = 1.45;
+/* Saturation is off. Pushing it to 1.45 made the green vivid, but vivid is not
+   what the asset is — it was inventing colour the basecolor does not contain.
+   1.0 is a no-op and the term is left in place as the one knob for it. */
+const GRADE_SATURATION = 1.0;
 const gradePass = new ShaderPass({
   uniforms: {
     tDiffuse: { value: null },
@@ -966,23 +937,12 @@ const gradePass = new ShaderPass({
       vec4 c = texture2D(tDiffuse, vUv);
       float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
 
-      /* split-tone: darks toward teal, lights toward mint */
-      float t = smoothstep(0.02, 0.55, l);
-      vec3 tint = mix(uShadow, uHigh, t);
-      c.rgb *= mix(vec3(1.0), tint, 0.14);
-
       /* contrast about a low pivot — deepens shadows, leaves highlights alone */
       c.rgb = clamp((c.rgb - uPivot) * uContrast + uPivot, 0.0, 1.0);
 
       /* vignette */
       vec2 d = vUv - 0.5;
       c.rgb *= clamp(1.0 - uVig * dot(d, d) * 1.9, 0.0, 1.0);
-
-      /* saturation, last, so it acts on the finished image */
-      {
-        float lum = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
-        c.rgb = clamp(mix(vec3(lum), c.rgb, uSat), 0.0, 1.0);
-      }
 
       gl_FragColor = c;
     }`
@@ -1001,7 +961,6 @@ new ResizeObserver(() => {
   /* EffectComposer multiplies by the renderer's pixel ratio internally, so it
      gets the CSS size here — passing device px would square the ratio. */
   composer.setSize(w, h);
-  bloomPass.setSize(w * pr, h * pr);
 }).observe(container);
 /* chrome.js rescale() changes __SCALE without changing container.clientWidth,
    so the ResizeObserver never fires — watch the window too. */
@@ -1012,7 +971,6 @@ addEventListener('resize', () => {
   renderer.setPixelRatio(pr);
   renderer.setSize(w, h);
   composer.setSize(w, h);
-  bloomPass.setSize(w * pr, h * pr);
 });
 
 /* -------------------------------------------------------- RENDER LOOP */
@@ -1100,7 +1058,6 @@ if (TUNE) {
   window.__renderer = renderer;
   window.__composer = composer;   /* lets a QA capture force a frame without the rAF loop */
   window.__film = filmPass;      /* .enabled = false to preview with no grain */
-  window.__bloom = bloomPass;
   window.__grade = gradePass;
   window.__screenGain = SCREEN_GAIN;
   window.__lights = { key: keyLight, fill: fillLight, rim: rimLight };

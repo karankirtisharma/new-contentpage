@@ -1134,3 +1134,64 @@ the previous configuration before assuming it was a regression: env 5 with no
 saturation gives **10.57%** against the shipped **10.01%**, and hiding the video
 screens changes neither. It predates this work and this change slightly reduces
 it.
+
+# 10 · Everything artificial taken back off the model
+
+Asked to remove the glow and the fake colour and render the GLB as it actually
+is. Four things were doing it, and all four are gone.
+
+**The material remap.** §7.11 scaled metalness to 0.15 and lifted roughness into
+a 0.42-0.90 band. It was there because the asset's own MR map is a near-mirror
+(metalness 0.961 median, roughness 0.020) and a mirror shows its surroundings
+rather than its own colour. But rewriting the material the asset shipped with is
+not the fix for that — giving it an environment worth reflecting is, which
+`RoomEnvironment` now does. The maps are used exactly as authored: `metalness`
+and `roughness` both 1.0 against the map, emissive black, colour multiplier
+white, no `onBeforeCompile` at all.
+
+**The saturation push.** `GRADE_SATURATION` 1.45 → 1.0. It made the green vivid,
+but vivid is not what the basecolor contains; it was inventing colour.
+
+**The split-tone.** It multiplied a cool tint into the darks. Removed from the
+shader; both colour uniforms are now white and unread.
+
+**The bloom.** `UnrealBloomPass` is no longer added to the composer at all,
+rather than run at strength 0, so its blur chain costs nothing. It was the last
+thing in the frame adding light the model does not emit.
+
+Verified on the shipped build: composer chain is `RenderPass, FilmPass,
+ShaderPass` with no bloom; material reports metalness 1 / roughness 1, no remap
+attached, emissive `000000`, colour `ffffff`; grade reports saturation 1.0,
+contrast 1.0, both tints `ffffff`.
+
+## 10.1 · What that costs, and why
+
+**It is much darker, and that is the asset.** A metal has no diffuse response,
+so the ambient and the three directional lights contribute almost nothing —
+they matter only where the metalness map dips (10th percentile 0.573). The
+environment is doing all of it, and a mirror can only show what is around it.
+A default viewer puts the model in a lit grey room; this puts it on a black
+stage.
+
+**Raising the environment does not rescue it.** Measured on the spine:
+
+| env | spine RGB | green clipped |
+|---|---|---|
+| 4 | 50, 71, 37 | 11.7% |
+| 8 | 57, 79, 42 | 14.4% |
+| 14 | 61, 84, 46 | 16.4% |
+| 20 | 63, 87, 48 | 17.4% |
+
+Five times the light buys 26% more brightness and throws away half again as much
+to clipping. That is what a mirror does: it is either reflecting a light panel,
+and blown, or reflecting the dark, and black. `ENV_INTENSITY` 8.0 is where it
+reads without throwing more away.
+
+**If it needs to be brighter, the honest lever is the room, not the model** —
+brighten the backdrop and the environment so there is more for the metal to
+reflect. Reaching for the material or a saturation push is what was just
+removed.
+
+Only remaining non-original colour in the frame is the video grade: the screens
+are still mapped onto the §2 green tiers (`HERO_ASSETS.screenGrade`). That is
+the footage, not the GLB, and was left alone.
