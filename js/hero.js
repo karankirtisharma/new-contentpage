@@ -9,7 +9,6 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { FilmPass } from 'three/addons/postprocessing/FilmPass.js';
@@ -146,50 +145,28 @@ renderer.setSize(container.clientWidth, container.clientHeight);
    lit materials only — the accent lines and the screen planes opt out below,
    so the §2 palette lands exactly where it did before. */
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.3;    /* raised again to meet the reference frame's brightness */
+/* No tone mapping, because a viewer does not apply one — NOT because ACES was
+   costing saturation. That was checked and it was not: environment-only at
+   strength 1, ACES measured saturation 0.435 against NoToneMapping's 0.438,
+   which is nothing. The wash was the environment's shape, not the curve. */
+renderer.toneMapping = THREE.NoToneMapping;
+renderer.toneMappingExposure = 1.0;    /* NoToneMapping ignores this; kept explicit */
 container.appendChild(renderer.domElement);
 
 /* ---------------------------------------------------------------- LIGHTS
-   Matched to how the asset renders in a default model viewer, which is the look
-   it was authored against. That look is image-based: a neutral studio
-   environment does nearly all of the work (see ENVIRONMENT) and the punctual
-   lights only shape it.
+   There are none, deliberately.
 
-   So the rig here is smaller than it was. Every light is still pure white —
-   nothing tints, the hue in the frame is the GLB's own basecolor and only that.
+   The model is lit by the studio environment and by nothing else, exactly as a
+   GLB viewer lights it: Surrounding = Studio, Strength = 1, no lamps in the
+   scene. Every punctual light that used to be here — an ambient, a key, a fill
+   and a back — is gone, so nothing in this scene can push the asset's lighting
+   around any more.
 
-   THE SPOT IS GONE. It was a 26-then-9 intensity cone at the mount, there to
-   motivate the pool drawn on the ceiling and to be the machine's key. With the
-   environment lighting the model properly it had no work left to do except put
-   a hotspot on the top of the canopy, which is the artefact this whole thread
-   started with. The ceiling's pool and the light shaft are drawn in their own
-   shaders and never depended on it.
-
-   Ambient carries the canopy. A disc that wide facing DOWN takes almost nothing
-   from a key above it and nothing from a rim behind it — in the reference frame
-   its underside is a lit olive-green, and ambient plus the environment is the
-   only thing that puts light there. */
-const LIGHT_WHITE = 0xffffff;     /* every light in the scene, no exceptions */
-const KEY_TINT    = LIGHT_WHITE;
-
-scene.add(new THREE.AmbientLight(LIGHT_WHITE, 3.0));
-
-/* KEY — front-left and above, the standard 3/4 position. World-fixed, so the
-   machine is modelled by it differently at each point of the orbit. */
-const keyLight = new THREE.DirectionalLight(LIGHT_WHITE, 3.0);
-keyLight.position.set(-2.6, 2.2, -1.9);
-scene.add(keyLight);
-
-/* FILL — opposite the key, so the far side keeps its form */
-const fillLight = new THREE.DirectionalLight(LIGHT_WHITE, 1.26);
-fillLight.position.set(2.8, 0.5, 1.6);
-scene.add(fillLight);
-
-/* BACK — grazing from behind and above, to lift the silhouette off the haze */
-const rimLight = new THREE.DirectionalLight(LIGHT_WHITE, 1.5);
-rimLight.position.set(1.6, 1.9, 2.6);
-scene.add(rimLight);
+   Removing them costs nothing elsewhere: the GLB carries the only
+   MeshStandardMaterial in the scene. The backdrop, the ceiling dome and the
+   light shaft are hand-shaded ShaderMaterials and the video screens are
+   MeshBasicMaterial, so none of them ever took a light. The model's lighting is
+   now completely independent of the scene and the background. */
 
 /* ------------------------------------------------------- ATMOSPHERE
    Fog gives the rig depth — the far arms sink back instead of reading as one
@@ -244,42 +221,58 @@ scene.fog = new THREE.FogExp2(0x0e1013, FOG_DENSITY);   /* neutral grey, no hue 
 }
 
 /* -------------------------------------------------------- ENVIRONMENT
-   RoomEnvironment — the same neutral studio that model-viewer, gltf-viewer and
-   three's own examples light a dropped-in GLB with. This is the "default model
-   lighting" the asset was authored against and is being matched to here.
+   The model's ONLY light, and deliberately the only one: a studio, at strength
+   1, with nothing else in the scene touching it. Whatever the backdrop, the
+   ceiling or the page does, the asset is lit the same way a viewer lights it.
 
-   It replaces a hand-built shell: a sphere carrying a three-stop vertical
-   gradient plus a bright card at the mount. That shell was the wrong shape of
-   thing for a near-mirror to reflect. A gradient has no features, so a polished
-   surface returns a smooth wash of grey-green and reads as tinted plastic;
-   RoomEnvironment is a little room with actual light panels in it, so the same
-   surface returns edges, and edges are what make it read as glass. The model
-   has looked like glass in every viewer except this one for exactly that
-   reason.
+   Built here rather than taken from `RoomEnvironment`, and the reason is
+   measured. RoomEnvironment is a bright grey ROOM — big pale walls. This
+   material is a near-mirror (metalness 0.961 median), and a mirror reflecting a
+   white room returns white, so the asset's green washed out: spine RGB
+   52, 67, 42 at saturation 0.438. A studio HDRI is the opposite shape — a dark
+   surround with a few concentrated softboxes — and reflecting mostly dark lets
+   the basecolor's green carry, with the panels showing up as highlights rather
+   than as a wash. Same geometry as the reference HDRI: dark room, four boxes.
 
-   It is generated at runtime from three's own addon — no asset, no texture
-   fetch, and PMREM is disposed straight after. */
-/* With the material left as authored this is the ONLY thing lighting the model,
-   so it carries the whole look. A metal has no diffuse response, so the ambient
-   and the three directional lights below contribute almost nothing to it — they
-   matter only where the metalness map dips (its 10th percentile is 0.573, so
-   parts of the machine are partly dielectric).
+     RoomEnvironment            52, 67, 42   sat 0.438
+     studio, surround 0.12      35, 55, 23   sat 0.575
+     studio, surround 0.02      46, 74, 30   sat 0.575
+     studio + brighter boxes    81,113, 59   sat 0.602   <- shipped
 
-   8.0 rather than the 1.0 a viewer would use, because a viewer puts the model in
-   a lit grey room and this puts it on a black stage: a mirror can only show what
-   is around it, and here there is very little. Even so it saturates quickly —
-   4 -> 20 moves the spine only from RGB 50,71,37 to 63,87,48 while the clipped
-   fraction climbs from 11.7% to 17.4%. That is what a mirror does: it is either
-   reflecting a light panel, and blown, or reflecting the dark, and black. 8 is
-   where it reads without throwing more away. */
-const ENV_INTENSITY = 8.0;
+   Brightness past that buys little and costs a lot: doubling the boxes again
+   reaches 104,134,82 but takes the clipped fraction from 26% to 36%, and the
+   blue channel climbs with the green, which is the wash returning. */
+const ENV_INTENSITY = 1.0;    /* Strength 1, as the viewer's panel reads */
+const ENV_SURROUND  = 0.02;   /* the dark room the softboxes sit in */
+const ENV_KEY       = 40;     /* key softbox; the rest are fractions of it */
 {
+  const envScene = new THREE.Scene();
+  envScene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(10, 24, 16),
+    new THREE.MeshBasicMaterial({
+      color: new THREE.Color(ENV_SURROUND, ENV_SURROUND, ENV_SURROUND),
+      side: THREE.BackSide
+    })
+  ));
+  /* w, h, x, y, z, intensity — key above front-left, fill right, rim behind,
+     and a weak bounce below so the canopy's underside is not a hole */
+  [[7, 5, -3,  5,  4, ENV_KEY],
+   [6, 5,  5,  1.5, 3, ENV_KEY * 0.38],
+   [6, 5,  0,  3, -6, ENV_KEY * 0.62],
+   [7, 4,  0, -4,  3, ENV_KEY * 0.18]].forEach(([w, h, x, y, z, i]) => {
+    const panel = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(i, i, i) })
+    );
+    panel.position.set(x, y, z);
+    panel.lookAt(0, 0, 0);
+    envScene.add(panel);
+  });
+
   const pmrem = new THREE.PMREMGenerator(renderer);
-  pmrem.compileEquirectangularShader();
-  const room = new RoomEnvironment();
-  scene.environment = pmrem.fromScene(room, 0.04).texture;
-  room.dispose();
+  scene.environment = pmrem.fromScene(envScene, 0.02).texture;
   pmrem.dispose();
+  envScene.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
 }
 
 /* ------------------------------------------------------------- CEILING
@@ -712,7 +705,7 @@ new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
        0.15 and lifted roughness into a 0.42-0.90 band. That was there because
        the map is a near-mirror (metalness 0.961 median, roughness 0.020) and a
        mirror shows its environment rather than its own colour — but the fix for
-       that is to give it an environment worth reflecting, which RoomEnvironment
+       that is to give it an environment worth reflecting, which the studio above
        now does, not to rewrite the material the asset shipped with. */
     const maxAniso = renderer.capabilities.getMaxAnisotropy();
     let glbMesh = null;
@@ -891,7 +884,7 @@ composer.addPass(new RenderPass(scene, camera));
    at all rather than run at strength 0, so its blur chain costs nothing. */
 /* Grain kept at a whisper, scanlines off entirely (they were the crawl). Set
    FILM_STRENGTH to 0 to drop the pass's contribution completely. */
-const FILM_STRENGTH = 0.06;   /* was 0.10 — grain is not where the mood comes from */
+const FILM_STRENGTH = 0.0;    /* off — grain is another thing sitting on top of the model */
 const filmPass = new FilmPass(FILM_STRENGTH, 0.0, 700, false);
 composer.addPass(filmPass);
 
@@ -916,7 +909,7 @@ const GRADE_PIVOT    = 0.16;   /* low pivot was crushing the grey backdrop to bl
 /* 0.42 -> 0.12. The canopy spans the top corners of the frame, which is exactly
    where a vignette bites hardest, and at 0.42 it was pulling the underside back
    to near-black after the lighting had just lit it. */
-const GRADE_VIGNETTE = 0.12;
+const GRADE_VIGNETTE = 0.0;   /* off — it darkened the model by where it sat in frame */
 /* Saturation is off. Pushing it to 1.45 made the green vivid, but vivid is not
    what the asset is — it was inventing colour the basecolor does not contain.
    1.0 is a no-op and the term is left in place as the one knob for it. */
@@ -1060,8 +1053,8 @@ if (TUNE) {
   window.__film = filmPass;      /* .enabled = false to preview with no grain */
   window.__grade = gradePass;
   window.__screenGain = SCREEN_GAIN;
-  window.__lights = { key: keyLight, fill: fillLight, rim: rimLight };
+  /* No __lights: there are none. The model is lit by scene.environment alone. */
   window.__mats = [];
   scene.traverse(o => { if (o.isMesh && o.material && o.material.isMeshStandardMaterial) window.__mats.push(o.material); });
-  console.log('[tune] on — __screens/__rig/__rigBody/__cam/__controls/__renderer/__film/__bloom');
+  console.log('[tune] on — __screens/__rig/__rigBody/__cam/__controls/__renderer/__composer/__film/__grade');
 }

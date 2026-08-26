@@ -1195,3 +1195,58 @@ removed.
 Only remaining non-original colour in the frame is the video grade: the screens
 are still mapped onto the §2 green tiers (`HERO_ASSETS.screenGrade`). That is
 the footage, not the GLB, and was left alone.
+
+## 10.2 · The model's lighting is now abstracted from the scene
+
+Asked to make the asset light the way a viewer lights it — Surrounding =
+Studio, Strength = 1 — and to keep the scene and the background out of it.
+
+**There are no lights in the scene at all.** The ambient, key, fill and back are
+deleted. Nothing in this file can push the asset's lighting around any more; it
+is lit by `scene.environment` and by nothing else. That costs nothing elsewhere:
+the GLB carries the only `MeshStandardMaterial` in the scene — the backdrop, the
+ceiling dome and the light shaft are hand-shaded `ShaderMaterial`s and the video
+screens are `MeshBasicMaterial`, so none of them ever took a light.
+
+**The environment is built here rather than taken from `RoomEnvironment`, and
+the reason is measured.** RoomEnvironment is a bright grey *room* — big pale
+walls. The material is a near-mirror, and a mirror reflecting a white room
+returns white, so the asset's green washed out. A studio HDRI is the opposite
+shape: a dark surround with a few concentrated softboxes, which is exactly what
+the reference's HDRI thumbnail shows. Reflecting mostly dark lets the basecolor
+carry and turns the panels into highlights rather than a wash.
+
+| | spine RGB | saturation |
+|---|---|---|
+| `RoomEnvironment`, strength 1 | 52, 67, 42 | 0.438 |
+| studio, surround 0.12 | 35, 55, 23 | 0.575 |
+| studio, surround 0.02 | 46, 74, 30 | 0.575 |
+| **studio, surround 0.02, brighter boxes** | **81, 113, 59** | **0.602** |
+
+Past that it stops paying: doubling the boxes again reaches 104,134,82 but takes
+the clipped fraction from 26% to 36%, and the blue channel climbs with the
+green — the wash coming back.
+
+Shipped at `ENV_INTENSITY` 1.0 (Strength 1), surround 0.02, four softboxes.
+Across the orbit the spine reads green 89-107 at saturation 0.62-0.90.
+
+### Correction: tone mapping was never the problem
+
+The previous commit's reasoning said ACES was rolling the green toward grey.
+That was checked afterwards and it is false: environment-only at strength 1,
+ACES measures saturation **0.435** against NoToneMapping's **0.438**. The wash
+was the environment's *shape*, not the curve. Tone mapping is off because a
+viewer does not apply one, which is a different and much weaker reason. The
+source comment has been corrected to say so.
+
+Also off, for the same "nothing sits on top of it" reason: the vignette (0.12 →
+0) and the film grain (0.06 → 0).
+
+### One bug this introduced and fixed
+
+Deleting the lights left `window.__lights = { key: keyLight, ... }` in the
+`?tune=1` block referring to bindings that no longer exist, which threw
+`ReferenceError: keyLight is not defined` on every tune-mode load. Removed. The
+console errors that appeared to persist after the fix were stale entries from
+the previous page load — confirmed by re-fetching the served file and checking
+that the tune block now runs to completion.
