@@ -174,21 +174,21 @@ container.appendChild(renderer.domElement);
 const LIGHT_WHITE = 0xffffff;     /* every light in the scene, no exceptions */
 const KEY_TINT    = LIGHT_WHITE;
 
-scene.add(new THREE.AmbientLight(LIGHT_WHITE, 2.4));
+scene.add(new THREE.AmbientLight(LIGHT_WHITE, 3.0));
 
 /* KEY — front-left and above, the standard 3/4 position. World-fixed, so the
    machine is modelled by it differently at each point of the orbit. */
-const keyLight = new THREE.DirectionalLight(LIGHT_WHITE, 2.4);
+const keyLight = new THREE.DirectionalLight(LIGHT_WHITE, 3.0);
 keyLight.position.set(-2.6, 2.2, -1.9);
 scene.add(keyLight);
 
 /* FILL — opposite the key, so the far side keeps its form */
-const fillLight = new THREE.DirectionalLight(LIGHT_WHITE, 1.0);
+const fillLight = new THREE.DirectionalLight(LIGHT_WHITE, 1.26);
 fillLight.position.set(2.8, 0.5, 1.6);
 scene.add(fillLight);
 
 /* BACK — grazing from behind and above, to lift the silhouette off the haze */
-const rimLight = new THREE.DirectionalLight(LIGHT_WHITE, 1.2);
+const rimLight = new THREE.DirectionalLight(LIGHT_WHITE, 1.5);
 rimLight.position.set(1.6, 1.9, 2.6);
 scene.add(rimLight);
 
@@ -260,11 +260,11 @@ scene.fog = new THREE.FogExp2(0x0e1013, FOG_DENSITY);   /* neutral grey, no hue 
 
    It is generated at runtime from three's own addon — no asset, no texture
    fetch, and PMREM is disposed straight after. */
-/* 5.0, not the 1.0 a viewer would use, because this scene is not a viewer: it
+/* 9.0, not the 1.0 a viewer would use, because this scene is not a viewer: it
    renders through ACES plus a contrast curve and a vignette, and it sits on a
-   near-black page rather than the viewer's grey room. Matched by eye against
-   the reference frame rather than assumed. */
-const ENV_INTENSITY = 5.0;
+   near-black page rather than the viewer's grey room. Measured against the
+   reference rather than guessed — see GRADE_SATURATION for the numbers. */
+const ENV_INTENSITY = 9.0;
 {
   const pmrem = new THREE.PMREMGenerator(renderer);
   pmrem.compileEquirectangularShader();
@@ -932,17 +932,36 @@ const GRADE_PIVOT    = 0.16;   /* low pivot was crushing the grey backdrop to bl
    where a vignette bites hardest, and at 0.42 it was pulling the underside back
    to near-black after the lighting had just lit it. */
 const GRADE_VIGNETTE = 0.12;
+/* Saturation, applied last. Brightness alone could not reach the reference
+   green: the environment is neutral, so every unit of it that lifts the model
+   also pushes the colour toward white. Measured on the spine, average RGB and
+   saturation of the lit pixels:
+
+     env 5,  no sat        58, 91, 36   sat 0.667   <- was shipping
+     env 5,  sat 1.4       48, 94, 21   sat 0.844   vivid but no brighter
+     env 12, no sat        76,129, 41   sat 0.743   brighter but washing out
+     env 12, sat 1.5       72,130, 36   sat 0.783   the reference's colour, but
+                                                    env 12 blows the flat panel
+                                                    backs to solid white
+     env 9,  sat 1.45      the same colour, nothing blown  <- shipped
+
+   So the two work together: the environment supplies the brightness and this
+   puts back the saturation it costs. The ceiling on the environment is set by
+   the model's flat glossy panels, not by the spine — at 12 they go white before
+   the spine is anywhere near clipping. */
+const GRADE_SATURATION = 1.45;
 const gradePass = new ShaderPass({
   uniforms: {
     tDiffuse: { value: null },
     uShadow: { value: GRADE_SHADOW }, uHigh: { value: GRADE_HIGH },
     uContrast: { value: GRADE_CONTRAST }, uPivot: { value: GRADE_PIVOT },
-    uVig: { value: GRADE_VIGNETTE }
+    uVig: { value: GRADE_VIGNETTE }, uSat: { value: GRADE_SATURATION }
   },
   vertexShader: `varying vec2 vUv;
     void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `uniform sampler2D tDiffuse; uniform vec3 uShadow; uniform vec3 uHigh;
-    uniform float uContrast; uniform float uPivot; uniform float uVig; varying vec2 vUv;
+    uniform float uContrast; uniform float uPivot; uniform float uVig; uniform float uSat;
+    varying vec2 vUv;
     void main(){
       vec4 c = texture2D(tDiffuse, vUv);
       float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
@@ -958,6 +977,12 @@ const gradePass = new ShaderPass({
       /* vignette */
       vec2 d = vUv - 0.5;
       c.rgb *= clamp(1.0 - uVig * dot(d, d) * 1.9, 0.0, 1.0);
+
+      /* saturation, last, so it acts on the finished image */
+      {
+        float lum = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+        c.rgb = clamp(mix(vec3(lum), c.rgb, uSat), 0.0, 1.0);
+      }
 
       gl_FragColor = c;
     }`

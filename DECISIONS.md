@@ -1085,3 +1085,52 @@ it. Confirmed by rendering the same frame with it on and off before changing it.
 
 Nothing else moved: FOV 34, the orbit height lock and the material remap are all
 as they were.
+
+## 9.1 · The green, matched to a close-up reference
+
+Brightness alone could not get there. The environment is neutral, so every unit
+of it that lifts the model also pushes the colour toward white — the model got
+brighter and less green at the same time. Measured on the spine (average RGB and
+saturation of the lit pixels, sampled from the rendered frame):
+
+| | spine RGB | saturation |
+|---|---|---|
+| env 5, no saturation | 58, 91, 36 | 0.667 |
+| env 5, saturation 1.4 | 48, 94, 21 | 0.844 |
+| env 12, no saturation | 76, 129, 41 | 0.743 |
+| env 12, saturation 1.5 | 72, 130, 36 | 0.783 |
+| **env 9, saturation 1.45** | **59-77, 118-142, 32-34** | **0.82-0.94** |
+
+So the two knobs work together: the environment supplies the brightness and a
+saturation term at the end of the grade puts back what it costs. `ENV_INTENSITY`
+9.0, ambient 3.0, key/fill/rim 3.0/1.26/1.5, `GRADE_SATURATION` 1.45.
+
+**The ceiling on the environment is set by the flat panels, not the spine.** At
+12 the model's glossy panel backs go solid white while the spine is still well
+short of clipping. 9 holds the same colour with nothing blown.
+
+### `toneMappingExposure` cannot be tuned at runtime
+
+Worth recording, because it cost a wrong conclusion. Three.js uploads
+`toneMappingExposure` inside `setProgram`, guarded by
+`if (refreshProgram || _currentCamera !== camera)` — so it is only re-sent when
+the shader program or the camera object changes. Setting it live and re-rendering
+does nothing at all: sweeping 0.5 → 3.0 produced byte-identical output, on a
+freshly loaded page, while `envMapIntensity` over the same range moved the image
+hugely.
+
+The shipped value **is** applied — it is uploaded when the program is first
+used. It is only *live* changes that are inert. The first read of that
+measurement was that ACES was not affecting the image and tone mapping should be
+swapped; that was wrong, and the four-way tone-mapping comparison that appeared
+to support it was invalid for the same reason. Change it in the source and
+reload.
+
+### The white flare at yaw 0 is not from this change
+
+At the head-on angle about 10% of lit pixels sit at full white on the panel
+backs — grazing-incidence reflection off flat glossy geometry. Checked against
+the previous configuration before assuming it was a regression: env 5 with no
+saturation gives **10.57%** against the shipped **10.01%**, and hiding the video
+screens changes neither. It predates this work and this change slightly reduces
+it.
