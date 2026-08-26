@@ -66,39 +66,30 @@ const SCROLL_SPIN     = 0.0016; /* radians of rig.rotation.y per scrolled design
    ORBIT_XZ with ORBIT_RISE of height relative to the target, so this is the
    angle the intro dolly lands on and the angle the orbit is now locked to.
    Retuning ORBIT_RISE or ORBIT_XZ moves the lock with it. */
-/* FRAMING — matched to a supplied reference frame.
-   Two knobs, and they are the whole composition.
+/* FRAMING — fitted to the design frame.
 
-   FRAME_DROP lowers the orbit centre — the target AND the camera together, so
-   the view direction is unchanged — which lifts everything in the frame by the
-   same amount. CAMERA_FOV then sets how much of the scene the frame holds.
+   Two knobs. FRAME_DROP moves the orbit centre — target AND camera together, so
+   the view direction never changes — which slides the whole scene vertically in
+   frame. CAMERA_FOV sets how much of it the frame holds.
 
-   The history matters, because these two have been pulled in opposite
-   directions. FOV went 28.5 -> 20 with a drop of 0.18 to push the canopy out of
-   shot: the canopy is a disc of world radius 1.651 seen from 3.47 away,
-   subtending ~50 degrees against a 44 degree frame, so it filled the top quarter
-   and read as a saucer with a lid. That worked — the lid edge went from 24.4%
-   down the frame to 3.2% — but it is a tight shot, and the reference frame
-   supplied afterwards is a wider one.
+   Both were fitted against the design rather than chosen, by sweeping the pair
+   and scoring each against three numbers read off it: the rig's top edge at
+   9.3% down the frame, its bottom at 83.0%, and its width at 64.6% of the frame.
 
-   FOV is now 34, fitted to that reference rather than chosen. Only the
-   HORIZONTAL fit is meaningful: #scene3d is a fixed 1024x629 box that chrome.js
-   scales, so a browser window shorter than the scaled canvas crops the bottom
-   by an unknown amount and every vertical measurement off a screenshot carries
-   that unknown. Width does not — the canvas always fills the viewport
-   horizontally. The reference has the machine spanning 14.5% to 85% of frame
-   width; at FOV 34 it spans 14.8% to 85.3%. FOV 33 gives 72.5% width and 35
-   gives 68.0%, so 34 is the fit, not a round number.
+     fov 34, drop  0.18   top 0.000 (cut off)  bottom 0.753  width 0.705
+     fov 34, drop  0.00   top 0.000 (cut off)  bottom 0.839  width 0.706
+     fov 40, drop -0.05   top 0.099            bottom 0.804  width 0.593
+     fov 37, drop -0.10   top 0.096            bottom 0.853  width 0.646   <- shipped
 
-   Consequence, stated plainly: at 34 the canopy and the ceiling are back in
-   shot. Hiding them and matching this reference are not compatible — the mount
-   sits directly above the machine, so any frame wide enough to show the machine
-   with margin also shows the mount. The reference frame itself shows it.
+   FRAME_DROP is NEGATIVE now. It was +0.18, which lifted the scene far enough
+   that the canopy left the top of the frame entirely — the design shows the
+   whole disc with air above it, so the orbit centre has to sit ABOVE the
+   machine's centre rather than below it, and the sign flips.
 
-   #scene3d's fixed box also means the aspect is 1.628 on every device, so a
-   vertical-FOV change is safe here in a way it would not be in a fluid layout. */
-const FRAME_DROP      = 0.18;   /* orbit centre below the machine's own centre */
-const CAMERA_FOV      = 34;     /* 28.5 -> 20 to hide the mount, -> 34 to match the reference */
+   #scene3d is a fixed 1024x629 box that chrome.js only scales, so the aspect is
+   1.628 on every device and this framing is identical everywhere. */
+const FRAME_DROP      = -0.10;  /* negative: orbit centre ABOVE the machine's centre */
+const CAMERA_FOV      = 37;     /* fitted to the design frame; see FRAMING */
 
 /* Unaffected by FRAME_DROP: both are built from ORBIT_XZ and ORBIT_RISE, which
    are offsets RELATIVE to the orbit centre, so moving that centre moves the
@@ -145,12 +136,21 @@ renderer.setSize(container.clientWidth, container.clientHeight);
    lit materials only — the accent lines and the screen planes opt out below,
    so the §2 palette lands exactly where it did before. */
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-/* No tone mapping, because a viewer does not apply one — NOT because ACES was
-   costing saturation. That was checked and it was not: environment-only at
-   strength 1, ACES measured saturation 0.435 against NoToneMapping's 0.438,
-   which is nothing. The wash was the environment's shape, not the curve. */
-renderer.toneMapping = THREE.NoToneMapping;
-renderer.toneMappingExposure = 1.0;    /* NoToneMapping ignores this; kept explicit */
+/* ACES, and the reason is highlights, not colour.
+
+   Without a curve every value over 1 hard-clips, and a mirror reflecting a
+   softbox is far over 1 — it came back as a flat white smear across the
+   canopy's underside and a solid white patch on the panel backs, 26% of lit
+   pixels at full white. That hard plateau is what read as a weird glow. ACES
+   compresses the overshoot into the top of the range instead of cutting it, so
+   a bright highlight stays a highlight and stops being a hole.
+
+   It is NOT here to fix colour, and it does not: measured earlier,
+   environment-only, ACES came back at saturation 0.435 against NoToneMapping's
+   0.438. The two are indistinguishable on hue; they differ only in what happens
+   above 1. */
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
 container.appendChild(renderer.domElement);
 
 /* ---------------------------------------------------------------- LIGHTS
@@ -242,9 +242,25 @@ scene.fog = new THREE.FogExp2(0x0e1013, FOG_DENSITY);   /* neutral grey, no hue 
    Brightness past that buys little and costs a lot: doubling the boxes again
    reaches 104,134,82 but takes the clipped fraction from 26% to 36%, and the
    blue channel climbs with the green, which is the wash returning. */
-const ENV_INTENSITY = 1.0;    /* Strength 1, as the viewer's panel reads */
+/* Strength 1, as the design's HDRI panel reads. The blowout that used to need
+   this pulled down to 0.20 is fixed at its source instead — see ENV_KEY. */
+const ENV_INTENSITY = 1.0;
 const ENV_SURROUND  = 0.02;   /* the dark room the softboxes sit in */
-const ENV_KEY       = 40;     /* key softbox; the rest are fractions of it */
+/* Key softbox brightness. 40 was tuned when the reflection was being scaled
+   down hard afterwards; at that level a mirror returns 8x full white and clips
+   flat however the multiplier is set, because the multiplier moves the whole
+   image and not the overshoot. The panel itself has to come down, and the knee
+   is sharp — measured on the head-on frame, as the fraction of lit pixels at
+   full white:
+
+     key 6.0   18.9% blown   the smear
+     key 3.0    0.2% blown   <- shipped, and the brightest that does not blow
+     key 1.8    0.0% blown   dimmer for nothing
+     key 1.0    0.0% blown   the highlights stop reading as highlights
+
+   Nothing between 6 and 3 was worth keeping: 6 puts the canopy's reflection of
+   the key well past what even ACES can roll off, 3 lands it just under. */
+const ENV_KEY       = 3;      /* key softbox; the rest are fractions of it */
 {
   const envScene = new THREE.Scene();
   envScene.add(new THREE.Mesh(

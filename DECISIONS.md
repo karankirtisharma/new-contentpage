@@ -1294,3 +1294,56 @@ eye on it.
 Segoe UI Semibold / Impact`. The design's face is a squarer techno display font;
 matching it properly means a webfont, and the build currently fetches nothing but
 three from a CDN. Worth adding if the exact face matters.
+
+## 11.1 · Fitted to the design frame, and the glow killed at its source
+
+Two separate faults, reported together.
+
+### Framing
+
+The rig was cropped at the top and sat too large. Both knobs were refitted by
+sweeping the pair and scoring against three numbers read off the design: rig top
+at 9.3% down the frame, bottom at 83.0%, width 64.6%.
+
+| FOV | drop | top | bottom | width |
+|---|---|---|---|---|
+| 34 | +0.18 | 0.000 *(cut off)* | 0.753 | 0.705 |
+| 34 | 0.00 | 0.000 *(cut off)* | 0.839 | 0.706 |
+| 40 | -0.05 | 0.099 | 0.804 | 0.593 |
+| **37** | **-0.10** | **0.096** | **0.853** | **0.646** |
+
+`FRAME_DROP` is negative now. It was +0.18, which lifted the scene until the
+canopy left the frame entirely; the design shows the whole disc with air above
+it, so the orbit centre has to sit *above* the machine's centre and the sign
+flips.
+
+### The glow
+
+It was not a glow effect — there is no bloom in this build. It was a **hard
+clip**: the canopy is a wide flat mirror, the environment's key softbox sat at
+intensity 40, so the reflection came back at 8x full white and cut off flat.
+A plateau of pure white across the underside, 26% of every lit pixel.
+
+Three things were tried in order, and only the last one is the fix:
+
+- **Scaling the reflection down** (`ENV_INTENSITY` 1.0 → 0.20) darkened the whole
+  image but left the smear, because a multiplier moves the picture and not the
+  overshoot. Still 26% blown.
+- **Turning ACES back on** helped everywhere else but not here — the curve
+  saturates around 4-6, and the reflection was at 8. Still 19% blown.
+- **Bringing the softbox itself down** is what worked, and the knee is sharp:
+
+| `ENV_KEY` | blown |
+|---|---|
+| 6.0 | 18.9% |
+| **3.0** | **0.2%** |
+| 1.8 | 0.0% |
+| 1.0 | 0.0%, and the highlights stop reading as highlights |
+
+Shipped at `ENV_KEY` 3 with `ENV_INTENSITY` back to 1.0 — the brightest setting
+that does not blow. Verified across the orbit: 0.13-0.25% blown at three of the
+four quarter-turns and 1.54% at the fourth, against 26% before.
+
+ACES is kept, but for what it actually does: rolling off the overshoot that is
+left. It was checked earlier and it does **not** affect saturation — 0.435
+against NoToneMapping's 0.438.
