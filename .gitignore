@@ -1,11 +1,19 @@
-# study material only — never shipped, never served
-/reference/
-# raw model source — the 57 MB Tripo export. Only the optimised
-# assets-final/hero-rig.glb is shipped; rebuild with qa/step1+step2.
-/source/
-# QA output
-/qa/*.png
+# Dependencies and build output live under site/ and are ignored by site/.gitignore.
+# This file covers the working directory around it.
 
-# dev-only asset pipeline deps
-/node_modules/
-/package-lock.json
+# The six GLBs at the top level are byte-identical copies of site/public/models/.
+# The app loads them from public/; keeping a second copy here would double the repo
+# for nothing. Delete these locally if you want — nothing reads them.
+/camera_rig_web.glb
+/futuristic_control_ring_web.glb
+/futuristic_machinery_web.glb
+/green_technical_device_web.glb
+/sci-fi_control_table_web.glb
+/sci-fi_prop_web.glb
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

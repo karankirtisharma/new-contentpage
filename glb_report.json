@@ -1,0 +1,1252 @@
+{
+ "camera_rig_3d_model.glb": {
+  "size_mb": 61.0,
+  "generator": "Tripo",
+  "extensionsUsed": [
+   "KHR_materials_volume",
+   "FB_ngon_encoding"
+  ],
+  "nodes": 1,
+  "meshes": 1,
+  "materials": 1,
+  "textures": 3,
+  "images": [
+   [
+    "image/jpeg",
+    0,
+    null
+   ],
+   [
+    "image/jpeg",
+    1,
+    null
+   ],
+   [
+    "image/jpeg",
+    2,
+    null
+   ]
+  ],
+  "animations": 0,
+  "skins": 0,
+  "scenes": 1,
+  "total_verts": 996874,
+  "total_tris": 1867348,
+  "primitives": [
+   {
+    "name": "meshes[0]",
+    "verts": 996874,
+    "tris": 1867348,
+    "attrs": [
+     "POSITION",
+     "NORMAL",
+     "TEXCOORD_0"
+    ],
+    "material": 0,
+    "min": [
+     -0.4893035888671875,
+     0.0,
+     -0.3317870795726776
+    ],
+    "max": [
+     0.4893035888671875,
+     0.4148406982421875,
+     0.3317870795726776
+    ]
+   }
+  ],
+  "image_details": [
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 5.2,
+    "size": [
+     8192,
+     8192
+    ],
+    "mode": "RGB",
+    "name": "camera+rig+3d+model_basecolor.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.6,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "camera+rig+3d+model_rm.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 1.0,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "camera+rig+3d+model_normal.jpg"
+   }
+  ],
+  "material_details": [
+   {
+    "name": "tripo_material_1b8debc5-506e-4996-99f5-55fe814eee44",
+    "baseColorTex": 0,
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallic": 1.0,
+    "roughness": 1.0,
+    "mrTex": 1,
+    "normalTex": 2,
+    "emissiveTex": null,
+    "emissiveFactor": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "alphaMode": "OPAQUE",
+    "doubleSided": false,
+    "extensions": null
+   }
+  ],
+  "node_list": [
+   {
+    "name": "tripo_node_1b8debc5-506e-4996-99f5-55fe814eee44",
+    "mesh": 0,
+    "children": [],
+    "translation": null,
+    "rotation": null,
+    "scale": null
+   }
+  ],
+  "bufferViews": 7
+ },
+ "futuristic_control_desk_3d_model.glb": {
+  "size_mb": 60.8,
+  "generator": "Tripo",
+  "extensionsUsed": [
+   "KHR_materials_volume",
+   "FB_ngon_encoding"
+  ],
+  "nodes": 1,
+  "meshes": 1,
+  "materials": 1,
+  "textures": 3,
+  "images": [
+   [
+    "image/jpeg",
+    0,
+    null
+   ],
+   [
+    "image/jpeg",
+    1,
+    null
+   ],
+   [
+    "image/jpeg",
+    2,
+    null
+   ]
+  ],
+  "animations": 0,
+  "skins": 0,
+  "scenes": 1,
+  "total_verts": 1023597,
+  "total_tris": 1938411,
+  "primitives": [
+   {
+    "name": "meshes[0]",
+    "verts": 1023597,
+    "tris": 1938411,
+    "attrs": [
+     "POSITION",
+     "NORMAL",
+     "TEXCOORD_0"
+    ],
+    "material": 0,
+    "min": [
+     -0.4898834228515625,
+     0.0,
+     -0.4795989990234375
+    ],
+    "max": [
+     0.4898834228515625,
+     0.4397430419921875,
+     0.4795989990234375
+    ]
+   }
+  ],
+  "image_details": [
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 3.7,
+    "size": [
+     8192,
+     8192
+    ],
+    "mode": "RGB",
+    "name": "futuristic+control+desk+3d+model_basecolor.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.5,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "futuristic+control+desk+3d+model_rm.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.6,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "futuristic+control+desk+3d+model_normal.jpg"
+   }
+  ],
+  "material_details": [
+   {
+    "name": "tripo_material_54446491-3473-4873-b148-9ec6a69d9e2c",
+    "baseColorTex": 0,
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallic": 1.0,
+    "roughness": 1.0,
+    "mrTex": 1,
+    "normalTex": 2,
+    "emissiveTex": null,
+    "emissiveFactor": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "alphaMode": "OPAQUE",
+    "doubleSided": false,
+    "extensions": null
+   }
+  ],
+  "node_list": [
+   {
+    "name": "tripo_node_54446491-3473-4873-b148-9ec6a69d9e2c",
+    "mesh": 0,
+    "children": [],
+    "translation": null,
+    "rotation": null,
+    "scale": null
+   }
+  ],
+  "bufferViews": 7
+ },
+ "futuristic_control_ring_3d_model.glb": {
+  "size_mb": 63.4,
+  "generator": "Tripo",
+  "extensionsUsed": [
+   "KHR_materials_volume",
+   "FB_ngon_encoding"
+  ],
+  "nodes": 1,
+  "meshes": 1,
+  "materials": 1,
+  "textures": 3,
+  "images": [
+   [
+    "image/jpeg",
+    0,
+    null
+   ],
+   [
+    "image/jpeg",
+    1,
+    null
+   ],
+   [
+    "image/jpeg",
+    2,
+    null
+   ]
+  ],
+  "animations": 0,
+  "skins": 0,
+  "scenes": 1,
+  "total_verts": 1039690,
+  "total_tris": 1952084,
+  "primitives": [
+   {
+    "name": "meshes[0]",
+    "verts": 1039690,
+    "tris": 1952084,
+    "attrs": [
+     "POSITION",
+     "NORMAL",
+     "TEXCOORD_0"
+    ],
+    "material": 0,
+    "min": [
+     -0.4893035888671875,
+     0.0,
+     -0.49078369140625
+    ],
+    "max": [
+     0.4893035888671875,
+     0.646331787109375,
+     0.49078369140625
+    ]
+   }
+  ],
+  "image_details": [
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 4.9,
+    "size": [
+     8192,
+     8192
+    ],
+    "mode": "RGB",
+    "name": "futuristic+control+ring+3d+model_basecolor.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 1.0,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "futuristic+control+ring+3d+model_rm.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.9,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "futuristic+control+ring+3d+model_normal.jpg"
+   }
+  ],
+  "material_details": [
+   {
+    "name": "tripo_material_2ce27bb7-53a7-4f3d-803d-ba4bdb8602ac",
+    "baseColorTex": 0,
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallic": 1.0,
+    "roughness": 1.0,
+    "mrTex": 1,
+    "normalTex": 2,
+    "emissiveTex": null,
+    "emissiveFactor": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "alphaMode": "OPAQUE",
+    "doubleSided": false,
+    "extensions": null
+   }
+  ],
+  "node_list": [
+   {
+    "name": "tripo_node_2ce27bb7-53a7-4f3d-803d-ba4bdb8602ac",
+    "mesh": 0,
+    "children": [],
+    "translation": null,
+    "rotation": null,
+    "scale": null
+   }
+  ],
+  "bufferViews": 7
+ },
+ "futuristic_control_table_3d_model.glb": {
+  "size_mb": 58.3,
+  "generator": "Tripo",
+  "extensionsUsed": [
+   "KHR_materials_volume",
+   "FB_ngon_encoding"
+  ],
+  "nodes": 1,
+  "meshes": 1,
+  "materials": 1,
+  "textures": 3,
+  "images": [
+   [
+    "image/jpeg",
+    0,
+    null
+   ],
+   [
+    "image/jpeg",
+    1,
+    null
+   ],
+   [
+    "image/jpeg",
+    2,
+    null
+   ]
+  ],
+  "animations": 0,
+  "skins": 0,
+  "scenes": 1,
+  "total_verts": 971342,
+  "total_tris": 1860777,
+  "primitives": [
+   {
+    "name": "meshes[0]",
+    "verts": 971342,
+    "tris": 1860777,
+    "attrs": [
+     "POSITION",
+     "NORMAL",
+     "TEXCOORD_0"
+    ],
+    "material": 0,
+    "min": [
+     -0.49200439453125,
+     0.0,
+     -0.4259796142578125
+    ],
+    "max": [
+     0.49200439453125,
+     0.1692962944507599,
+     0.4259796142578125
+    ]
+   }
+  ],
+  "image_details": [
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 3.8,
+    "size": [
+     8192,
+     8192
+    ],
+    "mode": "RGB",
+    "name": "futuristic+control+table+3d+model_basecolor.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.6,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "futuristic+control+table+3d+model_rm.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.5,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "futuristic+control+table+3d+model_normal.jpg"
+   }
+  ],
+  "material_details": [
+   {
+    "name": "tripo_material_f7849af3-5c61-4762-b89b-d0cc686968e1",
+    "baseColorTex": 0,
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallic": 1.0,
+    "roughness": 1.0,
+    "mrTex": 1,
+    "normalTex": 2,
+    "emissiveTex": null,
+    "emissiveFactor": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "alphaMode": "OPAQUE",
+    "doubleSided": false,
+    "extensions": null
+   }
+  ],
+  "node_list": [
+   {
+    "name": "tripo_node_f7849af3-5c61-4762-b89b-d0cc686968e1",
+    "mesh": 0,
+    "children": [],
+    "translation": null,
+    "rotation": null,
+    "scale": null
+   }
+  ],
+  "bufferViews": 7
+ },
+ "futuristic_machinery_3d_model.glb": {
+  "size_mb": 59.5,
+  "generator": "Tripo",
+  "extensionsUsed": [
+   "KHR_materials_volume",
+   "FB_ngon_encoding"
+  ],
+  "nodes": 1,
+  "meshes": 1,
+  "materials": 1,
+  "textures": 3,
+  "images": [
+   [
+    "image/jpeg",
+    0,
+    null
+   ],
+   [
+    "image/jpeg",
+    1,
+    null
+   ],
+   [
+    "image/jpeg",
+    2,
+    null
+   ]
+  ],
+  "animations": 0,
+  "skins": 0,
+  "scenes": 1,
+  "total_verts": 992524,
+  "total_tris": 1815722,
+  "primitives": [
+   {
+    "name": "meshes[0]",
+    "verts": 992524,
+    "tris": 1815722,
+    "attrs": [
+     "POSITION",
+     "NORMAL",
+     "TEXCOORD_0"
+    ],
+    "material": 0,
+    "min": [
+     -0.4904632568359375,
+     0.0,
+     -0.4888764023780823
+    ],
+    "max": [
+     0.4904632568359375,
+     0.28369140625,
+     0.4888764023780823
+    ]
+   }
+  ],
+  "image_details": [
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 4.5,
+    "size": [
+     8192,
+     8192
+    ],
+    "mode": "RGB",
+    "name": "futuristic+machinery+3d+model_basecolor.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.6,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "futuristic+machinery+3d+model_rm.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.8,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "futuristic+machinery+3d+model_normal.jpg"
+   }
+  ],
+  "material_details": [
+   {
+    "name": "tripo_material_40b91407-8192-46ed-a25c-0203caf368f3",
+    "baseColorTex": 0,
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallic": 1.0,
+    "roughness": 1.0,
+    "mrTex": 1,
+    "normalTex": 2,
+    "emissiveTex": null,
+    "emissiveFactor": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "alphaMode": "OPAQUE",
+    "doubleSided": false,
+    "extensions": null
+   }
+  ],
+  "node_list": [
+   {
+    "name": "tripo_node_40b91407-8192-46ed-a25c-0203caf368f3",
+    "mesh": 0,
+    "children": [],
+    "translation": null,
+    "rotation": null,
+    "scale": null
+   }
+  ],
+  "bufferViews": 7
+ },
+ "futuristic_space_station_3d_model.glb": {
+  "size_mb": 58.7,
+  "generator": "Tripo",
+  "extensionsUsed": [
+   "KHR_materials_volume",
+   "FB_ngon_encoding"
+  ],
+  "nodes": 1,
+  "meshes": 1,
+  "materials": 1,
+  "textures": 3,
+  "images": [
+   [
+    "image/jpeg",
+    0,
+    null
+   ],
+   [
+    "image/jpeg",
+    1,
+    null
+   ],
+   [
+    "image/jpeg",
+    2,
+    null
+   ]
+  ],
+  "animations": 0,
+  "skins": 0,
+  "scenes": 1,
+  "total_verts": 1033692,
+  "total_tris": 1975832,
+  "primitives": [
+   {
+    "name": "meshes[0]",
+    "verts": 1033692,
+    "tris": 1975832,
+    "attrs": [
+     "POSITION",
+     "NORMAL",
+     "TEXCOORD_0"
+    ],
+    "material": 0,
+    "min": [
+     -0.4898223876953125,
+     0.0,
+     -0.4888458251953125
+    ],
+    "max": [
+     0.4898223876953125,
+     0.4219207763671875,
+     0.4888458251953125
+    ]
+   }
+  ],
+  "image_details": [
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 1.0,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "futuristic+space+station+3d+model_basecolor.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.5,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "futuristic+space+station+3d+model_rm.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.4,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "futuristic+space+station+3d+model_normal.jpg"
+   }
+  ],
+  "material_details": [
+   {
+    "name": "tripo_material_9f2b7116-5f67-4834-81b9-a0d7945c45dd",
+    "baseColorTex": 0,
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallic": 1.0,
+    "roughness": 1.0,
+    "mrTex": 1,
+    "normalTex": 2,
+    "emissiveTex": null,
+    "emissiveFactor": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "alphaMode": "OPAQUE",
+    "doubleSided": false,
+    "extensions": null
+   }
+  ],
+  "node_list": [
+   {
+    "name": "tripo_node_9f2b7116-5f67-4834-81b9-a0d7945c45dd",
+    "mesh": 0,
+    "children": [],
+    "translation": null,
+    "rotation": null,
+    "scale": null
+   }
+  ],
+  "bufferViews": 7
+ },
+ "green_technical_device_3d_model.glb": {
+  "size_mb": 62.8,
+  "generator": "Tripo",
+  "extensionsUsed": [
+   "KHR_materials_volume",
+   "FB_ngon_encoding"
+  ],
+  "nodes": 1,
+  "meshes": 1,
+  "materials": 1,
+  "textures": 3,
+  "images": [
+   [
+    "image/jpeg",
+    0,
+    null
+   ],
+   [
+    "image/jpeg",
+    1,
+    null
+   ],
+   [
+    "image/jpeg",
+    2,
+    null
+   ]
+  ],
+  "animations": 0,
+  "skins": 0,
+  "scenes": 1,
+  "total_verts": 1035756,
+  "total_tris": 1938540,
+  "primitives": [
+   {
+    "name": "meshes[0]",
+    "verts": 1035756,
+    "tris": 1938540,
+    "attrs": [
+     "POSITION",
+     "NORMAL",
+     "TEXCOORD_0"
+    ],
+    "material": 0,
+    "min": [
+     -0.31170654296875,
+     0.0,
+     -0.3137359619140625
+    ],
+    "max": [
+     0.31170654296875,
+     0.978118896484375,
+     0.3137359619140625
+    ]
+   }
+  ],
+  "image_details": [
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 4.5,
+    "size": [
+     8192,
+     8192
+    ],
+    "mode": "RGB",
+    "name": "green+technical+device+3d+model_basecolor.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 1.0,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "green+technical+device+3d+model_rm.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.8,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "green+technical+device+3d+model_normal.jpg"
+   }
+  ],
+  "material_details": [
+   {
+    "name": "tripo_material_a9099e01-9c2e-4d29-9c87-7ad625888018",
+    "baseColorTex": 0,
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallic": 1.0,
+    "roughness": 1.0,
+    "mrTex": 1,
+    "normalTex": 2,
+    "emissiveTex": null,
+    "emissiveFactor": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "alphaMode": "OPAQUE",
+    "doubleSided": false,
+    "extensions": null
+   }
+  ],
+  "node_list": [
+   {
+    "name": "tripo_node_a9099e01-9c2e-4d29-9c87-7ad625888018",
+    "mesh": 0,
+    "children": [],
+    "translation": null,
+    "rotation": null,
+    "scale": null
+   }
+  ],
+  "bufferViews": 7
+ },
+ "sci-fi_control_console_3d_model.glb": {
+  "size_mb": 56.9,
+  "generator": "Tripo",
+  "extensionsUsed": [
+   "KHR_materials_volume",
+   "FB_ngon_encoding"
+  ],
+  "nodes": 1,
+  "meshes": 1,
+  "materials": 1,
+  "textures": 3,
+  "images": [
+   [
+    "image/jpeg",
+    0,
+    null
+   ],
+   [
+    "image/jpeg",
+    1,
+    null
+   ],
+   [
+    "image/jpeg",
+    2,
+    null
+   ]
+  ],
+  "animations": 0,
+  "skins": 0,
+  "scenes": 1,
+  "total_verts": 951089,
+  "total_tris": 1818539,
+  "primitives": [
+   {
+    "name": "meshes[0]",
+    "verts": 951089,
+    "tris": 1818539,
+    "attrs": [
+     "POSITION",
+     "NORMAL",
+     "TEXCOORD_0"
+    ],
+    "material": 0,
+    "min": [
+     -0.4922332763671875,
+     0.0,
+     -0.432159423828125
+    ],
+    "max": [
+     0.4922332763671875,
+     0.17833712697029114,
+     0.432159423828125
+    ]
+   }
+  ],
+  "image_details": [
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 3.7,
+    "size": [
+     8192,
+     8192
+    ],
+    "mode": "RGB",
+    "name": "sci-fi+control+console+3d+model_basecolor.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.4,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "sci-fi+control+console+3d+model_rm.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.5,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "sci-fi+control+console+3d+model_normal.jpg"
+   }
+  ],
+  "material_details": [
+   {
+    "name": "tripo_material_5c7e23fc-197d-4553-afdc-ae4ef492f5e7",
+    "baseColorTex": 0,
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallic": 1.0,
+    "roughness": 1.0,
+    "mrTex": 1,
+    "normalTex": 2,
+    "emissiveTex": null,
+    "emissiveFactor": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "alphaMode": "OPAQUE",
+    "doubleSided": false,
+    "extensions": null
+   }
+  ],
+  "node_list": [
+   {
+    "name": "tripo_node_5c7e23fc-197d-4553-afdc-ae4ef492f5e7",
+    "mesh": 0,
+    "children": [],
+    "translation": null,
+    "rotation": null,
+    "scale": null
+   }
+  ],
+  "bufferViews": 7
+ },
+ "sci-fi_control_table_3d_model.glb": {
+  "size_mb": 62.7,
+  "generator": "Tripo",
+  "extensionsUsed": [
+   "KHR_materials_volume",
+   "FB_ngon_encoding"
+  ],
+  "nodes": 1,
+  "meshes": 1,
+  "materials": 1,
+  "textures": 3,
+  "images": [
+   [
+    "image/jpeg",
+    0,
+    null
+   ],
+   [
+    "image/jpeg",
+    1,
+    null
+   ],
+   [
+    "image/jpeg",
+    2,
+    null
+   ]
+  ],
+  "animations": 0,
+  "skins": 0,
+  "scenes": 1,
+  "total_verts": 1039005,
+  "total_tris": 1984350,
+  "primitives": [
+   {
+    "name": "meshes[0]",
+    "verts": 1039005,
+    "tris": 1984350,
+    "attrs": [
+     "POSITION",
+     "NORMAL",
+     "TEXCOORD_0"
+    ],
+    "material": 0,
+    "min": [
+     -0.489898681640625,
+     0.0,
+     -0.42388916015625
+    ],
+    "max": [
+     0.489898681640625,
+     0.517303466796875,
+     0.42388916015625
+    ]
+   }
+  ],
+  "image_details": [
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 4.3,
+    "size": [
+     8192,
+     8192
+    ],
+    "mode": "RGB",
+    "name": "sci-fi+control+table+3d+model_basecolor.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.7,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "sci-fi+control+table+3d+model_rm.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.6,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "sci-fi+control+table+3d+model_normal.jpg"
+   }
+  ],
+  "material_details": [
+   {
+    "name": "tripo_material_d211b815-566f-4ac9-a4e2-7d410179a6f9",
+    "baseColorTex": 0,
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallic": 1.0,
+    "roughness": 1.0,
+    "mrTex": 1,
+    "normalTex": 2,
+    "emissiveTex": null,
+    "emissiveFactor": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "alphaMode": "OPAQUE",
+    "doubleSided": false,
+    "extensions": null
+   }
+  ],
+  "node_list": [
+   {
+    "name": "tripo_node_d211b815-566f-4ac9-a4e2-7d410179a6f9",
+    "mesh": 0,
+    "children": [],
+    "translation": null,
+    "rotation": null,
+    "scale": null
+   }
+  ],
+  "bufferViews": 7
+ },
+ "sci-fi_prop_3d_model.glb": {
+  "size_mb": 61.8,
+  "generator": "Tripo",
+  "extensionsUsed": [
+   "KHR_materials_volume",
+   "FB_ngon_encoding"
+  ],
+  "nodes": 1,
+  "meshes": 1,
+  "materials": 1,
+  "textures": 3,
+  "images": [
+   [
+    "image/jpeg",
+    0,
+    null
+   ],
+   [
+    "image/jpeg",
+    1,
+    null
+   ],
+   [
+    "image/jpeg",
+    2,
+    null
+   ]
+  ],
+  "animations": 0,
+  "skins": 0,
+  "scenes": 1,
+  "total_verts": 1023059,
+  "total_tris": 1924782,
+  "primitives": [
+   {
+    "name": "meshes[0]",
+    "verts": 1023059,
+    "tris": 1924782,
+    "attrs": [
+     "POSITION",
+     "NORMAL",
+     "TEXCOORD_0"
+    ],
+    "material": 0,
+    "min": [
+     -0.490478515625,
+     0.0,
+     -0.484893798828125
+    ],
+    "max": [
+     0.490478515625,
+     0.91058349609375,
+     0.484893798828125
+    ]
+   }
+  ],
+  "image_details": [
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 4.4,
+    "size": [
+     8192,
+     8192
+    ],
+    "mode": "RGB",
+    "name": "sci-fi+prop+3d+model_basecolor.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.9,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "sci-fi+prop+3d+model_rm.jpg"
+   },
+   {
+    "mime": "image/jpeg",
+    "bytes_mb": 0.7,
+    "size": [
+     4096,
+     4096
+    ],
+    "mode": "RGB",
+    "name": "sci-fi+prop+3d+model_normal.jpg"
+   }
+  ],
+  "material_details": [
+   {
+    "name": "tripo_material_c8f8d167-064a-4033-8be6-889fee5367f4",
+    "baseColorTex": 0,
+    "baseColorFactor": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "metallic": 1.0,
+    "roughness": 1.0,
+    "mrTex": 1,
+    "normalTex": 2,
+    "emissiveTex": null,
+    "emissiveFactor": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "alphaMode": "OPAQUE",
+    "doubleSided": false,
+    "extensions": null
+   }
+  ],
+  "node_list": [
+   {
+    "name": "tripo_node_c8f8d167-064a-4033-8be6-889fee5367f4",
+    "mesh": 0,
+    "children": [],
+    "translation": null,
+    "rotation": null,
+    "scale": null
+   }
+  ],
+  "bufferViews": 7
+ }
+}
