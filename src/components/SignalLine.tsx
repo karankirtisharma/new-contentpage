@@ -10,8 +10,9 @@ import Loader from './dom/Loader';
 import Drawer from './dom/Drawer';
 import Lightbox from './dom/Lightbox';
 import { Cursor, Nav, ProgressRail, ScrollHint } from './dom/Chrome';
-import { ChapterBlock, EngineBlock, HeroBlock, ScrollPad } from './dom/ChapterBlock';
+import { ChapterBlock, ChapterSpacer, EngineBlock, HeroBlock, ScrollPad } from './dom/ChapterBlock';
 import Fallback from './dom/Fallback';
+import { SHOW_COPY } from '@/lib/flags';
 
 // The canvas is client-only: no SSR, and it never blocks the DOM layer from painting.
 const Scene = dynamic(() => import('./scene/Scene'), { ssr: false });
@@ -50,25 +51,41 @@ export default function SignalLine() {
 
       <ScrollDriver>
         <div id="signal-scroll" className="dom-layer">
-          <Nav />
-          <ProgressRail />
-          <ScrollHint />
-          <Cursor />
+          {SHOW_COPY && (
+            <>
+              <Nav />
+              <ProgressRail />
+              <ScrollHint />
+              <Cursor />
+            </>
+          )}
 
           <main id="top">
             <ScrollPad />
-            <HeroBlock />
-            {CHAPTERS.slice(1, 5).map((c) => (
-              <ChapterBlock key={c.id} chapter={c} />
-            ))}
-            <EngineBlock />
+            {SHOW_COPY ? (
+              <>
+                <HeroBlock />
+                {CHAPTERS.slice(1, 5).map((c) => (
+                  <ChapterBlock key={c.id} chapter={c} />
+                ))}
+                <EngineBlock />
+              </>
+            ) : (
+              // Geometry only. The scroll length is the camera's timeline, so it survives
+              // the copy being switched off.
+              CHAPTERS.map((c) => <ChapterSpacer key={c.id} chapter={c} />)
+            )}
             <ScrollPad />
           </main>
         </div>
       </ScrollDriver>
 
-      <Drawer />
-      <Lightbox />
+      {SHOW_COPY && (
+        <>
+          <Drawer />
+          <Lightbox />
+        </>
+      )}
     </>
   );
 }

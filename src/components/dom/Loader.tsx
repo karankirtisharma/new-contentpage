@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useProgress } from '@react-three/drei';
 import { useSignal } from '@/lib/store';
+import { SHOW_COPY } from '@/lib/flags';
 
 /**
  * Aperture-iris loader — §7.
@@ -110,31 +111,35 @@ export default function Loader() {
           );
         })}
 
-        <text
-          textAnchor="middle"
-          y="6"
-          fill="#7dffa0"
-          style={{
-            fontFamily: 'var(--font-mono, monospace)',
-            fontSize: 20,
-            letterSpacing: '0.1em',
-            opacity: open ? 0 : 1,
-            transition: 'opacity .4s',
-          }}
-        >
-          {String(Math.round(pct)).padStart(3, '0')}
-        </text>
+        {SHOW_COPY && (
+          <text
+            textAnchor="middle"
+            y="6"
+            fill="#7dffa0"
+            style={{
+              fontFamily: 'var(--font-mono, monospace)',
+              fontSize: 20,
+              letterSpacing: '0.1em',
+              opacity: open ? 0 : 1,
+              transition: 'opacity .4s',
+            }}
+          >
+            {String(Math.round(pct)).padStart(3, '0')}
+          </text>
+        )}
       </svg>
 
-      <div
-        className="pointer-events-none absolute bottom-14 left-1/2 -translate-x-1/2 text-center"
-        style={{ opacity: open ? 0 : 1, transition: 'opacity .5s' }}
-      >
-        <p className="label">Cyphernaut · Content Engine</p>
-        <p className="mt-2 font-mono text-[10px] tracking-[0.14em] text-[#4b5c52] truncate max-w-[70vw]">
-          {loaded ? 'CALIBRATING LENS' : (item || 'LOADING SIGNAL').replace(/^.*\//, '')}
-        </p>
-      </div>
+      {SHOW_COPY && (
+        <div
+          className="pointer-events-none absolute bottom-14 left-1/2 -translate-x-1/2 text-center"
+          style={{ opacity: open ? 0 : 1, transition: 'opacity .5s' }}
+        >
+          <p className="label">Cyphernaut · Content Engine</p>
+          <p className="mt-2 font-mono text-[10px] tracking-[0.14em] text-[#4b5c52] truncate max-w-[70vw]">
+            {loaded ? 'CALIBRATING LENS' : (item || 'LOADING SIGNAL').replace(/^.*\//, '')}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

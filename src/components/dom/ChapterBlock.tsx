@@ -44,6 +44,18 @@ export function ScrollPad() {
 }
 
 /**
+ * A chapter's scroll geometry with none of its copy — what runs while SHOW_COPY is off.
+ *
+ * The camera timeline is driven by document height, so these sections have to stay
+ * mounted even when their words do not: drop them and the scrollable range collapses,
+ * `t` never leaves 0, and the dolly sits parked on the first beat. Same id, same height,
+ * nothing rendered inside.
+ */
+export function ChapterSpacer({ chapter }: { chapter: Chapter }) {
+  return <section id={chapter.id} aria-hidden style={{ height: sectionHeight(chapter) }} />;
+}
+
+/**
  * Splits a headline on newlines so each line can clip-reveal independently.
  *
  * `as` keeps the document to one h1 (the hero) with every chapter an h2. §7 asks for a
