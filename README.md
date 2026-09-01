@@ -4,11 +4,7 @@ A scroll-driven WebGL page. The visitor travels a 240-unit lunar corridor past s
 machines, one per chapter, and the copy is pinned to the camera's position on that
 journey rather than to the page.
 
-The app is in [`site/`](site). Everything else at this level is the spec it was built
-against.
-
 ```bash
-cd site
 npm install
 npm run dev            # http://localhost:3000
 ```
@@ -23,8 +19,8 @@ quality tier.
 
 | | |
 |---|---|
-| [`site/`](site) | The Next.js + React Three Fiber app |
-| [`site/BUILD-NOTES.md`](site/BUILD-NOTES.md) | **Where the build departs from the plan, and why.** The traps, the measurements, the things that looked right in source and did nothing on the GPU |
+| `src/`, `public/`, `scripts/` | The Next.js + React Three Fiber app |
+| [`BUILD-NOTES.md`](BUILD-NOTES.md) | **Where the build departs from the plan, and why.** The traps, the measurements, the things that looked right in source and did nothing on the GPU |
 | [`MASTER-OVERHAUL.md`](MASTER-OVERHAUL.md) | The implementation spec: research digest, visual blueprint, tier matrix, twelve phases with gates |
 | [`CREATIVE-BRIEF.md`](CREATIVE-BRIEF.md) | The art direction the overhaul answers to |
 | [`content-page-3d-plan.md`](content-page-3d-plan.md) | The original plan, kept for the record |
@@ -40,13 +36,14 @@ state.
 
 Four ideas carry most of the look:
 
-- **One height field, four consumers.** `lib/terrain.ts` is the single answer to "how high
-  is the ground at (x, z)". The terrain mesh IS that function sampled on a grid; the
-  boulders bed into it, the machines are seated on it, and the camera is grounded against
-  it. They cannot disagree.
-- **Camera beats are computed, not typed.** `lib/world.ts` states shots as intent — "a
-  three-quarter of the rig, filling a third of the frame, subject right" — and
-  `lib/cameraPath.ts` resolves the heights against the terrain. See BUILD-NOTES §13–15.
+- **One height field, four consumers.** [`src/lib/terrain.ts`](src/lib/terrain.ts) is the
+  single answer to "how high is the ground at (x, z)". The terrain mesh IS that function
+  sampled on a grid; the boulders bed into it, the machines are seated on it, and the
+  camera is grounded against it. They cannot disagree.
+- **Camera beats are computed, not typed.** [`src/lib/world.ts`](src/lib/world.ts) states
+  shots as intent — "a three-quarter of the rig, filling a third of the frame, subject
+  right" — and [`src/lib/cameraPath.ts`](src/lib/cameraPath.ts) resolves the heights
+  against the terrain. See BUILD-NOTES §13–15.
 - **Fog is a material chunk, not `scene.fog`.** Height fog with per-channel extinction and
   a moon-directional in-scatter term, patched into every lit material before tone mapping.
   Green comes from looking toward the moon; turn away and the air goes grey.
@@ -54,12 +51,19 @@ Four ideas carry most of the look:
   AgX last over HalfFloat buffers, so a bloom threshold of 1.0 selects actual light
   sources instead of any bright surface.
 
+## Deployment
+
+`vercel.json` pins the framework and the build commands, so the project deploys from the
+repository root with no dashboard configuration. It is explicit rather than relying on
+auto-detection because this repo previously held a static site, and a stored "Other"
+framework preset would otherwise serve the source tree as files.
+
 ## Generated textures
 
-`site/public/textures/*.png` are committed so a clone renders immediately. They are
+`public/textures/*.png` are committed so a clone renders immediately. They are
 deterministic output — `npm run gen:textures` rebuilds them from
-[`site/scripts/gen-textures.mjs`](site/scripts/gen-textures.mjs), which contains its own
-PNG encoder rather than pulling an image library.
+[`scripts/gen-textures.mjs`](scripts/gen-textures.mjs), which contains its own PNG encoder
+rather than pulling an image library.
 
 ## Known gaps
 
